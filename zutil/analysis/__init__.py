@@ -9,11 +9,14 @@ from data import ref_data_dir
 
 import os
 
+
 def is_remote():
-    return data.remote_data;
+    return data.remote_data
+
 
 def get_ref(filename):
-    return os.path.join(data.ref_data_dir,filename)
-    
+    return os.path.join(data.ref_data_dir, filename)
+
+
 def get_data(filename):
-    return os.path.join(data.data_dir,filename)
+    return os.path.join(data.data_dir, filename)

@@ -43,41 +43,47 @@ from plot_report import Report
 
 
 def get_figure(plt):
-    return plt.figure(figsize=(8,5),dpi=100, facecolor='w', edgecolor=cl.zeno_orange)
-    
-def x_label(ax,text):
-    ax.set_xlabel(text, fontsize=ft.axis_font_size, fontweight='bold', color=cl.zeno_grey)
-    
-def y_label(ax,text):
-    ax.set_ylabel(text, fontsize=ft.axis_font_size, fontweight='bold', color=cl.zeno_grey)
-    
-def set_title(ax,text):
-    ax.set_title(text,fontsize=ft.title_font_size)
-    
-def set_suptitle(fig,text):
+    return plt.figure(figsize=(8, 5), dpi=100, facecolor='w', edgecolor=cl.zeno_orange)
+
+
+def x_label(ax, text):
+    ax.set_xlabel(text, fontsize=ft.axis_font_size,
+                  fontweight='bold', color=cl.zeno_grey)
+
+
+def y_label(ax, text):
+    ax.set_ylabel(text, fontsize=ft.axis_font_size,
+                  fontweight='bold', color=cl.zeno_grey)
+
+
+def set_title(ax, text):
+    ax.set_title(text, fontsize=ft.title_font_size)
+
+
+def set_suptitle(fig, text):
     fig.suptitle(text, fontsize=24, fontweight='normal', color=cl.zeno_grey)
-    
-def set_legend(ax,location,label_list=None):
+
+
+def set_legend(ax, location, label_list=None):
     if label_list != None:
-        legend = ax.legend(loc=location, scatterpoints=1, numpoints=1, shadow=False, 
-                           fontsize=ft.legend_font,labels=label_list)
+        legend = ax.legend(loc=location, scatterpoints=1, numpoints=1, shadow=False,
+                           fontsize=ft.legend_font, labels=label_list)
     else:
-        legend = ax.legend(loc=location, scatterpoints=1, numpoints=1, shadow=False, 
+        legend = ax.legend(loc=location, scatterpoints=1, numpoints=1, shadow=False,
                            fontsize=ft.legend_font)
     legend.get_frame().set_facecolor('white')
     return legend
+
 
 def set_ticks(ax):
 
     ax.tick_params(axis='x')
 
     for tick in ax.xaxis.get_major_ticks():
-        tick.label.set_fontsize(ft.axis_tick_font_size) 
-        tick.label.set_fontweight('normal') 
+        tick.label.set_fontsize(ft.axis_tick_font_size)
+        tick.label.set_fontweight('normal')
         tick.label.set_color(cl.zeno_orange)
     for tick in ax.yaxis.get_major_ticks():
         tick.label.set_fontsize(ft.axis_tick_font_size)
-        tick.label.set_fontweight('normal') 
+        tick.label.set_fontweight('normal')
         tick.label.set_color(cl.zeno_orange)
-    
-    

@@ -160,19 +160,21 @@ def mag(vec):
 def R_2vect(R, vector_orig, vector_fin):
     """Calculate the rotation matrix required to rotate from one vector to another.
 
-    For the rotation of one vector to another, there are an infinit series of rotation matrices
-    possible.  Due to axially symmetry, the rotation axis can be any vector lying in the symmetry
-    plane between the two vectors.  Hence the axis-angle convention will be used to construct the
-    matrix with the rotation axis defined as the cross product of the two vectors.  The rotation
-    angle is the arccosine of the dot product of the two unit vectors.
+    For the rotation of one vector to another, there are an infinite series of
+    rotation matrices possible.  Due to axially symmetry, the rotation axis can
+    be any vector lying in the symmetry plane between the two vectors.  Hence
+    the axis-angle convention will be used to construct the matrix with the
+    rotation axis defined as the cross product of the two vectors.  The
+    rotation angle is the arccosine of the dot product of the two unit vectors.
 
-    Given a unit vector parallel to the rotation axis, w = [x, y, z] and the rotation angle a,
-    the rotation matrix R is::
+    Given a unit vector parallel to the rotation axis, w = [x, y, z] and the
+    rotation angle a, the rotation matrix R is::
 
-              |  1 + (1-cos(a))*(x*x-1)   -z*sin(a)+(1-cos(a))*x*y   y*sin(a)+(1-cos(a))*x*z |
-        R  =  |  z*sin(a)+(1-cos(a))*x*y   1 + (1-cos(a))*(y*y-1)   -x*sin(a)+(1-cos(a))*y*z |
-              | -y*sin(a)+(1-cos(a))*x*z   x*sin(a)+(1-cos(a))*y*z   1 + (1-cos(a))*(z*z-1)  |
+    ca = (1-cos(a))
 
+          |  1 + ca*(x*x-1)  -z*sin(a)+ca*x*y  y*sin(a)+ca*x*z |
+    R  =  |  z*sin(a)+ca*x*y  1 + ca*(y*y-1)  -x*sin(a)+ca*y*z |
+          | -y*sin(a)+ca*x*z  x*sin(a)+ca*y*z  1 + ca*(z*z-1)  |
 
     @param R:           The 3x3 rotation matrix to update.
     @type R:            3x3 numpy array
@@ -182,10 +184,9 @@ def R_2vect(R, vector_orig, vector_fin):
     @type vector_fin:   numpy array, len 3
     """
     # Python module imports.
-    from math import acos, atan2, cos, pi, sin
-    from numpy import array, cross, dot, float64, hypot, zeros
+    from math import acos, cos, sin
+    from numpy import cross, dot
     from numpy.linalg import norm
-    from random import gauss, uniform
 
     # Convert the vectors to unit vectors.
     vector_orig = vector_orig / norm(vector_orig)
@@ -244,6 +245,7 @@ def turbine_speed_interpolate(u_inf, tip_speed_curve):
     ts = np.interp(u_inf, wsc[0], wsc[1])
     return ts
 
+
 def create_turbine_segments_simple(turbine_zone_dict, u_ref, density, turbine_name_dict={}, turbine_name="", number_of_segments=12):
     # turbine_zone_dict is a Python dictionary containing the fluid zone defintion for the turbine
     # u_ref is the reference wind speed in metres / second
@@ -254,29 +256,29 @@ def create_turbine_segments_simple(turbine_zone_dict, u_ref, density, turbine_na
     ro = turbine_zone_dict['outer radius']
     rotor_swept_area = (math.pi * ro * ro) - (math.pi * ri * ri)
 
-    tc = np.interp(u_ref,\
-                   np.array(turbine_zone_dict['thrust coefficient curve']).T[0],\
+    tc = np.interp(u_ref,
+                   np.array(turbine_zone_dict[
+                            'thrust coefficient curve']).T[0],
                    np.array(turbine_zone_dict['thrust coefficient curve']).T[1])
-    
-    ts = np.interp(u_ref,\
-                   np.array(turbine_zone_dict['tip speed ratio curve']).T[0],\
+
+    ts = np.interp(u_ref,
+                   np.array(turbine_zone_dict['tip speed ratio curve']).T[0],
                    np.array(turbine_zone_dict['tip speed ratio curve']).T[1])
     # Calculate rotation speed from tip speed ratio
     omega = ts * u_ref / ro
-    
-    power = np.interp(u_ref,\
-                      np.array(turbine_zone_dict['turbine power curve']).T[0],\
+
+    power = np.interp(u_ref,
+                      np.array(turbine_zone_dict['turbine power curve']).T[0],
                       np.array(turbine_zone_dict['turbine power curve']).T[1])
 
-    total_thrust = 0.5*density*rotor_swept_area*u_ref*u_ref*tc
+    total_thrust = 0.5 * density * rotor_swept_area * u_ref * u_ref * tc
     total_torque = 0.0
     if omega > 0.0:
-        total_torque = power/omega
-        
+        total_torque = power / omega
+
     # Divide into segments
     dtheta = math.radians(360.0 / number_of_segments)
     annulus = []
-    theta = 0.0
     area_check = 0.0
     thrust_check = 0.0
     torque_check = 0.0
@@ -289,8 +291,8 @@ def create_turbine_segments_simple(turbine_zone_dict, u_ref, density, turbine_na
             if max_r > ro:
                 dr = ro - r
             rp = r + 0.5 * dr
-            dt = total_thrust*(dtheta*rp*dr/rotor_swept_area)
-            dq = total_torque*(dtheta*rp*dr/rotor_swept_area)/rp
+            dt = total_thrust * (dtheta * rp * dr / rotor_swept_area)
+            dq = total_torque * (dtheta * rp * dr / rotor_swept_area) / rp
             annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
             area_check = area_check + dtheta * rp * dr
             thrust_check = thrust_check + dt
@@ -298,7 +300,7 @@ def create_turbine_segments_simple(turbine_zone_dict, u_ref, density, turbine_na
             # print str(i) + ' ' + str(rp) + ' ' + str(dt) + ' ' + str(dq)
             r = r + dr
     # print annulus
-    
+
     if MPI.COMM_WORLD.Get_rank() == 0:
         print 'WARNING: Torque applied evenly over disc area'
         print 'wind speed = ' + str(u_ref) + ' m/s'
@@ -315,6 +317,7 @@ def create_turbine_segments_simple(turbine_zone_dict, u_ref, density, turbine_na
 
     return annulus
 
+
 def create_turbine_segments_simple_nonuniform(turbine_zone_dict, u_ref, density, number_of_segments=12):
     # turbine_zone_dict is a Python dictionary containing the fluid zone defintion for the turbine
     # u_ref is the reference wind speed in metres / second
@@ -325,25 +328,26 @@ def create_turbine_segments_simple_nonuniform(turbine_zone_dict, u_ref, density,
     ro = turbine_zone_dict['outer radius']
     rotor_swept_area = (math.pi * ro * ro) - (math.pi * ri * ri)
 
-    tc = np.interp(u_ref,\
-                   np.array(turbine_zone_dict['thrust coefficient curve']).T[0],\
+    tc = np.interp(u_ref,
+                   np.array(turbine_zone_dict[
+                            'thrust coefficient curve']).T[0],
                    np.array(turbine_zone_dict['thrust coefficient curve']).T[1])
-    
-    ts = np.interp(u_ref,\
-                   np.array(turbine_zone_dict['tip speed ratio curve']).T[0],\
+
+    ts = np.interp(u_ref,
+                   np.array(turbine_zone_dict['tip speed ratio curve']).T[0],
                    np.array(turbine_zone_dict['tip speed ratio curve']).T[1])
     # Calculate rotation speed from tip speed ratio
     omega = ts * u_ref / ro
-    
-    power = np.interp(u_ref,\
-                      np.array(turbine_zone_dict['turbine power curve']).T[0],\
+
+    power = np.interp(u_ref,
+                      np.array(turbine_zone_dict['turbine power curve']).T[0],
                       np.array(turbine_zone_dict['turbine power curve']).T[1])
 
-    total_thrust = 0.5*density*rotor_swept_area*u_ref*u_ref*tc
+    total_thrust = 0.5 * density * rotor_swept_area * u_ref * u_ref * tc
     total_torque = 0.0
     if omega > 0.0:
-        total_torque = power/omega
-    
+        total_torque = power / omega
+
     if MPI.COMM_WORLD.Get_rank() == 0:
         print 'WARNING: Torque applied evenly over disc area'
         print 'wind speed = ' + str(u_ref) + ' m/s'
@@ -356,11 +360,10 @@ def create_turbine_segments_simple_nonuniform(turbine_zone_dict, u_ref, density,
         print 'rotational speed = ' + str(omega) + ' rad/s'
         print 'total thrust = ' + str(total_thrust) + ' Newtons'
         print 'total torque = ' + str(total_torque) + ' Joules/rad'
-    
+
     # Divide into segments
     dtheta = math.radians(360.0 / number_of_segments)
     annulus = []
-    theta = 0.0
     area_check = 0.0
     thrust_check = 0.0
     for i in range(number_of_segments):
@@ -372,8 +375,8 @@ def create_turbine_segments_simple_nonuniform(turbine_zone_dict, u_ref, density,
             if max_r > ro:
                 dr = ro - r
             rp = r + 0.5 * dr
-            dt = total_thrust*(dtheta*rp*dr/rotor_swept_area)
-            dq = total_torque*(dtheta*rp*dr/rotor_swept_area)
+            dt = total_thrust * (dtheta * rp * dr / rotor_swept_area)
+            dq = total_torque * (dtheta * rp * dr / rotor_swept_area)
             annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
             area_check = area_check + dtheta * rp * dr
             thrust_check = thrust_check + dt
@@ -408,7 +411,7 @@ def create_turbine_segments(thrust_coefficient, blade_inner_location,
 
     # dt
     # dq
- 
+
     if thrust_coefficient > 0.999:
         print 'Induction model expects thrust coefficient < 1.0'
         print 'For greater range use simple turbine model'
@@ -416,8 +419,8 @@ def create_turbine_segments(thrust_coefficient, blade_inner_location,
         print 'Resetting thrust coefficient to 0.8'
         thrust_coefficient = 0.8
 
-    area = (math.pi * radius_outer * radius_outer) - math.pi * radius_inner * radius_inner
-    total_thrust = 0.5*area*density*u_inf*u_inf*thrust_coefficient
+    area = (math.pi * radius_outer * radius_outer) - \
+        math.pi * radius_inner * radius_inner
 
     induction_factor = (4.0 - math.sqrt(4.0 * 4.0 - 4.0 *
                                         4.0 * thrust_coefficient)) / (2.0 * 4.0)
@@ -429,7 +432,6 @@ def create_turbine_segments(thrust_coefficient, blade_inner_location,
 
     dr = 0.0
     r = radius_inner
-    theta = 0.0
     annulus = []
     area_check = 0.0
     thrust_check = 0.0
@@ -496,7 +498,7 @@ def project_to_plane(pt, plane_point, plane_normal):
 
 
 def clockwise_angle(up_vector, pt_vector, plane_normal):
-    from numpy import zeros, array, dot, linalg, cross
+    from numpy import dot, cross
 
     v_dot = dot(up_vector, pt_vector)
     v_det = dot(plane_normal, cross(up_vector, pt_vector))
@@ -508,79 +510,79 @@ def clockwise_angle(up_vector, pt_vector, plane_normal):
 
     return r
 
-def convolution(disc,disc_centre,disc_radius,disc_normal,disc_up,
-                cell_centre_list,cell_volume_list):
+
+def convolution(disc, disc_centre, disc_radius, disc_normal, disc_up,
+                cell_centre_list, cell_volume_list):
     from mpi4py import MPI
     import libconvolution as cv
-    from numpy import zeros,array,dot,linalg,cross, asarray, ndarray
+    from numpy import asarray, ndarray
 
     cell_centre_list_np = asarray(cell_centre_list)
     cell_volume_list_np = asarray(cell_volume_list)
-    kernel_3d = False
 
     weighted_sum = np.zeros(len(disc))
 
-    weighted_sum = cv.convolution_2dkernel_weights(disc,disc_centre,disc_radius,disc_normal,disc_up,
-                cell_centre_list_np,cell_volume_list_np)
+    weighted_sum = cv.convolution_2dkernel_weights(disc, disc_centre, disc_radius, disc_normal, disc_up,
+                                                   cell_centre_list_np, cell_volume_list_np)
     # Need to reduce weighted sum over all processes
     totals = np.zeros_like(weighted_sum)
 
-    MPI.COMM_WORLD.Allreduce(weighted_sum, totals, op = MPI.SUM)
+    MPI.COMM_WORLD.Allreduce(weighted_sum, totals, op=MPI.SUM)
     weighted_sum = totals
 
     thrust_check_total = 0
 
-    cell_force = np.zeros(len(cell_centre_list_np)*3)
-    thrust_check = cv.convolution_2dkernel_force(disc,disc_centre,disc_radius,disc_normal,disc_up,
-                cell_centre_list_np,cell_volume_list_np, weighted_sum, cell_force)
+    cell_force = np.zeros(len(cell_centre_list_np) * 3)
+    thrust_check = cv.convolution_2dkernel_force(disc, disc_centre, disc_radius, disc_normal, disc_up,
+                                                 cell_centre_list_np, cell_volume_list_np, weighted_sum, cell_force)
 
     thrust_check_array = np.array([thrust_check])
     thrust_check_total_array = np.array([0.0])
 
-    MPI.COMM_WORLD.Allreduce(thrust_check_array, thrust_check_total_array, op = MPI.SUM)
+    MPI.COMM_WORLD.Allreduce(
+        thrust_check_array, thrust_check_total_array, op=MPI.SUM)
     thrust_check_total = thrust_check_total_array[0]
     thrust_check = thrust_check_total
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'Convolved total thrust: ',thrust_check
+        print 'Convolved total thrust: ', thrust_check
 
-    #thrust_check = 0.0
+    # thrust_check = 0.0
     total_thrust = 0.0
-    for idx,w in enumerate(weighted_sum):
+    for idx, w in enumerate(weighted_sum):
         segment = disc[idx]
-                #if w > 0.0:
+        # if w > 0.0:
         #    thrust_check += segment[0]
         total_thrust += segment[0]
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'Specified total thrust: ',total_thrust
+        print 'Specified total thrust: ', total_thrust
 
-    #Broken: Cell_force_scaled will have a different struct to cell_force
+    # Broken: Cell_force_scaled will have a different struct to cell_force
     if thrust_check > 0.0:
-        thrust_factor = total_thrust/thrust_check
+        thrust_factor = total_thrust / thrust_check
         if MPI.COMM_WORLD.Get_rank() == 0:
             print 'Scaling thrust: ', thrust_factor
-        cell_force_scaled=[]
-        for cell in range(len(cell_force)/3):
-            cell_force_scaled.append((cell_force[cell*3 + 0]*thrust_factor,cell_force[cell*3 + 1]*thrust_factor,cell_force[cell*3 + 2]*thrust_factor))
+        cell_force_scaled = []
+        for cell in range(len(cell_force) / 3):
+            cell_force_scaled.append((cell_force[cell * 3 + 0] * thrust_factor, cell_force[
+                                     cell * 3 + 1] * thrust_factor, cell_force[cell * 3 + 2] * thrust_factor))
         return cell_force_scaled
     else:
         cell_force = ndarray.tolist(cell_force)
         cell_array = iter(cell_force)
         return zip(cell_array, cell_array, cell_array)
-    
+
     cell_force = ndarray.tolist(cell_force)
     cell_array = iter(cell_force)
     return zip(cell_array, cell_array, cell_array)
 
-        
-        
+
 def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
-                cell_centre_list, cell_volume_list):
+                 cell_centre_list, cell_volume_list):
     from mpi4py import MPI
 
     from numpy import zeros, array, dot, linalg, cross
-    #from zutil import R_2vect
 
     cell_force = []
 
@@ -655,13 +657,13 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
                 # 3D kernel
                 eta = 1.0 / ((epsilon**2) * math.sqrt(math.pi) **
                              3) * math.exp(-(distance / epsilon)**2)
-                #/math.fabs(dot(disc_normal,unit_distance_vec))
+                # math.fabs(dot(disc_normal,unit_distance_vec))
 
                 weighted_sum[idx] += max(1.0e-16, eta *
                                          cell_volume_list[cell_idx])
 
                 # 1D kernel
-                #eta = 1.0/(epsilon*math.sqrt(math.pi)) * math.exp(-(distance/epsilon)**2)
+                # eta = 1.0/(epsilon*math.sqrt(math.pi)) * math.exp(-(distance/epsilon)**2)
 
                 # print eta,cell_centre,disc_pt
 
@@ -671,9 +673,9 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 # Set torque force
                 # Vector for centre to pt
-                #disc_vec = disc_pt - array(disc_centre)
-                #unit_disc_vec = disc_vec/linalg.norm(disc_vec)
-                #torque_vector = cross(unit_disc_vec,disc_normal)
+                # disc_vec = disc_pt - array(disc_centre)
+                # unit_disc_vec = disc_vec/linalg.norm(disc_vec)
+                # torque_vector = cross(unit_disc_vec,disc_normal)
 
                 # for i in range(3):
                 #    cell_dq[i] += dq_per_area*torque_vector[i]*eta
@@ -688,7 +690,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
             plane_pt_radius = linalg.norm(plane_pt - disc_centre)
             plane_pt_theta = 0.0
             if plane_pt_radius > 0.0:
-                #plane_pt_theta  = math.acos(dot([0.0,0.0,1.0],(plane_pt-disc_centre)/plane_pt_radius))
+                # plane_pt_theta  = math.acos(dot([0.0,0.0,1.0],(plane_pt-disc_centre)/plane_pt_radius))
                 plane_pt_theta = clockwise_angle(
                     disc_up, (plane_pt - disc_centre) / plane_pt_radius, array(disc_normal))
 
@@ -725,7 +727,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
                 distance_vec = array(cell_centre) - plane_pt
                 distance = math.sqrt(dot(distance_vec, distance_vec))
 
-                #epsilon = 2.0*dr
+                # epsilon = 2.0*dr
                 epsilon = 0.2 * disc_radius
 
                 # 1D kernel
@@ -770,7 +772,6 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 distance_vec = array(cell_centre) - disc_pt
                 distance = math.sqrt(dot(distance_vec, distance_vec))
-                unit_distance_vec = distance_vec / distance
 
                 epsilon = 2.0 * dr
 
@@ -900,7 +901,6 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
     if MPI.COMM_WORLD.Get_rank() == 0:
         print 'Convolved total thrust: ', thrust_check
 
-    #thrust_check = 0.0
     total_thrust = 0.0
     for idx, w in enumerate(weighted_sum):
         segment = disc[idx]
@@ -919,7 +919,9 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
         for cell in cell_force:
             force = cell
             cell_force_scaled.append(
-                (force[0] * thrust_factor, force[1] * thrust_factor, force[2] * thrust_factor))
+                (force[0] * thrust_factor,
+                 force[1] * thrust_factor,
+                 force[2] * thrust_factor))
 
         return cell_force_scaled
     else:

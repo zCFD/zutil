@@ -29,6 +29,7 @@ import time
 
 from zutil import analysis
 
+
 def sum_and_zone_filter_array(input, array_name, ignore_zone, filter=None):
     sum = [0.0, 0.0, 0.0]
     p = input.GetCellData().GetArray(array_name)
@@ -874,7 +875,6 @@ def sum_array(input, array_name):
     return sum
 
 
-
 def get_case_file():
     with cd(remote_dir):
         get(case_name + '.py', '%(path)s')
@@ -926,9 +926,9 @@ def get_case_parameters_str(case_name, **kwargs):
     else:
         try:
             # Get contents of local file
-            with open(_remote_dir+'/'+case_name + '.py') as f:
+            with open(_remote_dir + '/' + case_name + '.py') as f:
                 case_file_str = f.read()
-    
+
                 if case_file_str is not None:
                     # print status_file_str
                     return case_file_str
@@ -938,6 +938,7 @@ def get_case_parameters_str(case_name, **kwargs):
         except:
             print 'WARNING: ' + case_name + '.py file not found'
             return None
+
 
 def get_case_parameters(case_name, **kwargs):
     case_file_str = get_case_parameters_str(case_name, **kwargs)
@@ -974,9 +975,9 @@ def get_status_dict(case_name, **kwargs):
     else:
         try:
             # Get contents of local file
-            with open(_remote_dir+'/'+case_name + '_status.txt') as f:
+            with open(_remote_dir + '/' + case_name + '_status.txt') as f:
                 status_file_str = f.read()
-    
+
                 if status_file_str is not None:
                     # print status_file_str
                     return json.loads(status_file_str)

@@ -33,7 +33,7 @@ class Report(object):
     def plot(self, report_file):
 
         if not os.path.isfile(report_file):
-            print("File not found: "+str(report_file))
+            print("File not found: " + str(report_file))
             return
 
         fig = plt.figure(figsize=(8, 5), dpi=100)
@@ -134,9 +134,9 @@ class Report(object):
         display(button)
 
     def plot_performance(self, log_file):
-        
+
         if not os.path.isfile(log_file):
-            print("File not found: "+str(logfile))
+            print("File not found: " + str(logfile))
             return
 
         elapsed_time = []

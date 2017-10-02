@@ -68,6 +68,7 @@ def port_test(rport, lport):
     with hide('everything'), remote_tunnel(int(rport), local_port=int(lport)):
         run('cd')
 
+
 def run_uname(with_tunnel):
 
     with hide('everything'):
