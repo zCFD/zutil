@@ -1,6 +1,6 @@
 ipython==5.5.0
 Fabric==1.14.0
-ipywidgets==7.0.1
+ipywidgets==7.0.3
 matplotlib==2.1.0rc1
 mpi4py==2.0.0
 numpy==1.13.3
