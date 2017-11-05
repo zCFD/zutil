@@ -1,2 +1,2 @@
 -r requirements.txt
-nose2
+nose2==0.7.0
