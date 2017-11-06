@@ -31,6 +31,9 @@ from paraview.simple import *
 import numpy as np
 import post
 import zutil
+import os
+from zutil import ABL
+import vtk
 
 # Usage
 #import zutil.farm as farm
@@ -614,6 +617,12 @@ def create_trbx_zcfd_input(case_name='windfarm',
                            turbine_files=[['xyz_location_file1.txt', 'turbine_type1.trbx'],
                                           ['xyz_location_file2.txt', 'turbine_type2.trbx']],
                            **kwargs):
+
+    # Ensure turbine folder exists
+    directory = './turbine_vtp/'
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+
     # Make sure that the turbine zone contains the reference point
     if (turbine_zone_length_factor < 2.5 * reference_point_offset):
         print 'WARNING: Increasing Turbine Zone Length Factor from ' \
@@ -626,18 +635,21 @@ def create_trbx_zcfd_input(case_name='windfarm',
     global min_dist, closest_point
     from xml.etree import ElementTree as ET
     local_surface = None
-    if terrain_file != None:
+    if terrain_file is not None:
         reader = OpenDataFile(terrain_file)
         local_surface = servermanager.Fetch(reader)
         print 'terrain file = ' + terrain_file
+        pointLocator = vtk.vtkPointLocator()
+        pointLocator.SetDataSet(local_surface)
+        pointLocator.BuildLocator()
+
     # Step 1: Read in the location data (.txt) and turbine information (.trbx)
     # for each turbine type
     idx = 0
     with open(case_name + '_zones.py', 'w') as tz:
         tz.write('turb_zone = {\n')
         with open(case_name + '_probes.py', 'w') as tp:
-            tp.write('turb_probe = { \n \'report\' : { \n    \'frequency\' : ' +
-                     str(report_frequency) + ',\n     \'monitor\' : { \n')
+            tp.write('turb_probe = { \n')
             for [location_file_name, trbx_file_name] in turbine_files:
                 print 'trbx file name = ' + trbx_file_name
                 trbx = ET.ElementTree(file=trbx_file_name)
@@ -675,9 +687,12 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     # Step 2: Work out the local elevation
                     min_dist = 1.0e16
                     closest_point = [min_dist, min_dist, min_dist]
-                    if local_surface != None:
-                        post.for_each(local_surface, closest_point_func, s=[
-                                      easting, northing, 0.0])
+                    if local_surface is not None:
+                        pid = pointLocator.FindClosestPoint([
+                            easting, northing, 0.0])
+                        closest_point = local_surface.GetPoint(pid)
+                        # post.for_each(local_surface, closest_point_func, s=[
+                        #              easting, northing, 0.0])
                         height = closest_point[2]
                         hub_z = height + float(turbine_dict['SelectedHeight'])
                     else:
@@ -686,14 +701,14 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     # Step 3: Generate the turbine region files
                     # (./turbine_vtp/*.vtp)
                     rd = float(turbine_dict['RotorDiameter'])
-                    generate_turbine_region('./turbine_vtp/' + name,
+                    generate_turbine_region(directory + name,
                                             [easting, northing, hub_z],
                                             float(turbine_dict[
                                                   'RotorDiameter']),
                                             wind_direction,
                                             turbine_zone_length_factor,
                                             True)
-                    generate_turbine('./turbine_disc_vtp/' + name,
+                    generate_turbine(directory + name,
                                      [easting, northing, hub_z],
                                      float(turbine_dict['RotorDiameter']),
                                      wind_direction,
@@ -703,7 +718,8 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     # (./turbine_zone.py)
                     tz.write('\'FZ_' + str(idx) + '\':{\n')
                     tz.write('\'type\':\'disc\',\n')
-                    tz.write('\'def\':\'./turbine_vtp/' + name +
+                    tz.write('\'name\': \'' + name + '\',\n')
+                    tz.write('\'def\':\'' + directory + name +
                              '-' + str(wind_direction) + '.vtp\',\n')
                     if (len(turbine_dict['DataTable'].keys()) == 0):
                         print 'WARNING: Windspeed DataTable empty - using Reference Wind Speed = ' + str(reference_wind_speed)
@@ -782,7 +798,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         '        \'point\' : [' + str(easting) + ',' + str(northing) + ',' + str(hub_z) + '],\n')
                     tp.write('        \'variables\' : [\'V\', \'ti\'],\n')
                     tp.write('        },\n')
-            tp.write('},\n  },\n } \n')
+            tp.write('} \n')
         tz.write('}\n')
 
 
@@ -822,3 +838,228 @@ def extract_probe_data(case_name='windfarm',
             print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_y ' + str(V[0][1])
             print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_z ' + str(V[0][2])
             print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_ti ' + str(ti[0] + 0.1)
+
+
+def generate_mesh_pts():
+    start = 2.0
+    max_height = 20000
+    growth_rate = 1.3
+
+    pts = []
+    # 1.3 growth rate to layer height
+    current_height = start
+    current_pos = start
+    pts.append(current_pos)
+    while current_pos < max_height:
+        current_height = min(100.0, current_height * growth_rate)
+        current_pos = current_pos + current_height
+        pts.append(current_pos)
+        # print current_height
+
+    return np.array(pts)
+
+
+def create_profile(profile_name, hub_height, hub_height_vel, direction, roughness,
+                   scale_k=False, plot=False,
+                   kappa=0.41, rho=1.225, cmu=0.03, mu=1.789e-5,
+                   latitude=55.0):
+
+    # Using RH Law compute utau using hub values
+    utau = ABL.friction_velocity(hub_height_vel, hub_height, roughness, kappa)
+
+    print 'Friction Velocity: ' + str(utau)
+
+    # Ref http://orbit.dtu.dk/files/3737714/ris-r-1688.pdf
+    coriolis_parameter = ABL.coriolis_parameter(latitude)
+    geostrophic_plane = ABL.ekman_layer_height(utau, coriolis_parameter)
+
+    print 'Ekman Layer top: ' + str(geostrophic_plane)
+    print 'This is top of ABL for neutral conditions'
+    print 'Wall Stress: ' + str(rho * utau**2)
+
+    pts = generate_mesh_pts()
+
+    vel = ABL.wind_speed_array(pts, utau, roughness, kappa)
+
+    if scale_k:
+        k_scale = (np.ones(len(pts)) -
+                   np.minimum(np.ones(len(pts)), pts / geostrophic_plane))**2
+    else:
+        k_scale = np.ones(len(pts))
+
+    k = k_scale * (utau**2) / math.sqrt(cmu)
+    eps = np.ones(len(pts)) * (utau**3) / (kappa * (pts + roughness))
+    # Note this mut/mu
+    mut = rho * cmu * k**2 / (eps * mu)
+    TI = (2 * k / 3)**0.5 / vel
+    lengthscale = cmu**0.75 * k**1.5 / eps
+
+    du_dz = np.gradient(vel, pts, edge_order=2)
+
+    stress = (mut * mu) * du_dz
+
+    points = vtk.vtkPoints()
+    for x in pts:
+        points.InsertNextPoint([0.0, 0.0, x])
+
+    vel_vec = vtk.vtkFloatArray()
+    vel_vec.SetNumberOfComponents(3)
+    vel_vec.SetName('Velocity')
+    for v in vel:
+        vel_vec.InsertNextTuple(zutil.vector_from_wind_dir(direction, v))
+
+    ti_vec = vtk.vtkFloatArray()
+    ti_vec.SetNumberOfComponents(1)
+    ti_vec.SetName('TI')
+    for t in TI:
+        ti_vec.InsertNextTuple([t])
+
+    mut_vec = vtk.vtkFloatArray()
+    mut_vec.SetNumberOfComponents(1)
+    mut_vec.SetName('EddyViscosity')
+    for m in mut:
+        mut_vec.InsertNextTuple([m])
+
+    # Create poly data
+    linesPolyData = vtk.vtkPolyData()
+    linesPolyData.SetPoints(points)
+    linesPolyData.GetPointData().AddArray(vel_vec)
+    linesPolyData.GetPointData().AddArray(ti_vec)
+    linesPolyData.GetPointData().AddArray(mut_vec)
+
+    # Write
+    print 'Writing: ' + profile_name + '.vtp'
+    writer = vtk.vtkXMLPolyDataWriter()
+    writer.SetFileName(profile_name + '.vtp')
+    writer.SetInputData(linesPolyData)
+    writer.Write()
+
+    if plot:
+        fig = get_figure(plt)
+        ax = fig.add_subplot(111)
+        ax.grid(True)
+        x_label(ax, 'Velocity')
+        y_label(ax, 'Height')
+        set_ticks(ax)
+        ax.semilogy(vel, pts)
+        if scale_k:
+            ax.set_ylim(None, geostrophic_plane)
+
+        fig = get_figure(plt)
+        ax = fig.add_subplot(111)
+        ax.grid(True)
+        x_label(ax, 'TI')
+        y_label(ax, 'Height')
+        set_ticks(ax)
+        ax.semilogy(TI, pts)
+        if scale_k:
+            ax.set_ylim(None, geostrophic_plane)
+
+        fig = get_figure(plt)
+        ax = fig.add_subplot(111)
+        ax.grid(True)
+        x_label(ax, 'Length scale')
+        y_label(ax, 'Height')
+        set_ticks(ax)
+        if scale_k:
+            ax.set_ylim(0.0, geostrophic_plane)
+        ax.plot(lengthscale, pts)
+
+        fig = get_figure(plt)
+        ax = fig.add_subplot(111)
+        ax.grid(True)
+        x_label(ax, 'mut/mu')
+        y_label(ax, 'Height')
+        set_ticks(ax)
+        if scale_k:
+            ax.set_ylim(0.0, geostrophic_plane)
+        ax.plot(mut, pts)
+
+        fig = get_figure(plt)
+        ax = fig.add_subplot(111)
+        ax.grid(True)
+        x_label(ax, 'stress')
+        y_label(ax, 'Height')
+        set_ticks(ax)
+        if scale_k:
+            ax.set_ylim(0.0, geostrophic_plane)
+
+
+def get_case_name(base_case, wind_direction, wind_speed):
+    wind_direction_str = '{0:.2f}'.format(wind_direction).replace('.', 'p')
+    wind_speed_str = '{0:.2f}'.format(wind_speed).replace('.', 'p')
+    return base_case + '_' + wind_direction_str + '_' + wind_speed_str
+
+
+def get_profile_name(base_case, wind_direction, wind_speed):
+    wind_direction_str = '{0:.2f}'.format(wind_direction).replace('.', 'p')
+    wind_speed_str = '{0:.2f}'.format(wind_speed).replace('.', 'p')
+    return 'profile_' + wind_direction_str + '_' + wind_speed_str
+
+
+def generate_inputs(base_case, wind_direction, wind_speed, wind_height, roughness_length,
+                    turbine_info, terrain_file):
+
+    # Generate new name for this case
+    case_name = get_case_name(base_case, wind_direction, wind_speed)
+    profile_name = get_profile_name(base_case, wind_direction, wind_speed)
+
+    # Generate turbines
+    create_trbx_zcfd_input(case_name=case_name,
+                           wind_direction=wind_direction,
+                           reference_wind_speed=wind_speed,
+                           num_processes=32,
+                           report_frequency=10,
+                           update_frequency=1,
+                           terrain_file=terrain_file,
+                           reference_point_offset=0.0,
+                           turbine_zone_length_factor=0.2,
+                           model='simple',
+                           turbine_files=turbine_info)
+
+    # Generate profile
+    create_profile(profile_name, wind_height, wind_speed, wind_direction,
+                   roughness_length)
+
+    from string import Template
+
+    case_file = """
+import zutil
+base_case = '$basecasename'
+case = '$casename'
+
+parameters = zutil.get_parameters_from_file(base_case)
+
+turbine_zones = zutil.get_zone_info(case+'_zones')
+
+for key,value in turbine_zones.turb_zone.items():
+    valid_key = zutil.find_next_zone(parameters,'FZ')
+    parameters[valid_key]=value
+
+turbine_probes = zutil.get_zone_info(case+'_probes')
+for key,value in turbine_probes.turb_probe.items():
+    if not 'report' in parameters:
+        parameters['report'] = {}
+    if not 'monitor' in parameters['report']:
+        parameters['report']['monitor'] = {}
+    valid_key = zutil.find_next_zone(parameters['report']['monitor'],'MR')
+    parameters['report']['monitor'][valid_key]=value
+
+# Set reference speed
+parameters['IC_1']['V']['vector'] = zutil.vector_from_wind_dir($wind_direction,$wind_speed)
+
+# Set profile
+if not 'profile' in parameters['IC_1']:
+    parameters['IC_1']['profile'] = {}
+parameters['IC_1']['profile']['field'] = '$profile_name.vtp'
+"""
+
+    case_file_str = Template(case_file).substitute(basecasename=base_case,
+                                                   casename=case_name,
+                                                   wind_direction=wind_direction,
+                                                   wind_speed=wind_speed,
+                                                   profile_name=profile_name
+                                                   )
+    print 'Writing: ' + case_name + '.py'
+    with open(case_name + '.py', 'w') as f:
+        f.write(case_file_str)

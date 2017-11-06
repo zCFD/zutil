@@ -26,7 +26,7 @@ def init(default_data_dir=None,
     if 'REF_DATA_DIR' in os.environ:
         ref_data_dir = os.environ['REF_DATA_DIR']
     else:
-        if default_ref_data_dir == None:
+        if default_ref_data_dir is None:
             ref_data_dir = data_dir
         else:
             ref_data_dir = default_ref_data_dir

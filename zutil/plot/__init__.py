@@ -42,8 +42,8 @@ import colour as cl
 from plot_report import Report
 
 
-def get_figure(plt):
-    return plt.figure(figsize=(8, 5), dpi=100, facecolor='w', edgecolor=cl.zeno_orange)
+def get_figure(plt, x=8, y=5):
+    return plt.figure(figsize=(x, y), dpi=100, facecolor='w', edgecolor=cl.zeno_orange)
 
 
 def x_label(ax, text):
@@ -65,7 +65,7 @@ def set_suptitle(fig, text):
 
 
 def set_legend(ax, location, label_list=None):
-    if label_list != None:
+    if label_list is not None:
         legend = ax.legend(loc=location, scatterpoints=1, numpoints=1, shadow=False,
                            fontsize=ft.legend_font, labels=label_list)
     else:

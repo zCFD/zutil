@@ -984,22 +984,28 @@ def get_status_dict(case_name, **kwargs):
                 else:
                     print 'WARNING: ' + case_name + '_status.txt file not found'
                     return None
-        except:
+        except Exception, e:
+            print 'WARNING: ' + case_name + '_status.txt file not found'
+            print 'Caught exception ' + str(e)
             return None
 
 
 def get_num_procs(case_name, **kwargs):
     # remote_host,remote_dir,case_name):
     status = get_status_dict(case_name, **kwargs)
-    if status != None:
+    if status is not None:
         if 'num processor' in status:
             return status['num processor']
         else:
             return None
+    else:
+        print 'status file not found'
 
 
-def get_case_root(case_name, num_procs):
-    return case_name + '_P' + num_procs + '_OUTPUT/' + case_name
+def get_case_root(case_name, num_procs=None):
+    if num_procs is None:
+        num_procs = get_num_procs(case_name)
+    return case_name + '_P' + str(num_procs) + '_OUTPUT/' + case_name
 
 
 def get_case_report(case):

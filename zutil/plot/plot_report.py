@@ -12,6 +12,9 @@ import os
 
 class Report(object):
 
+    def __init__(self):
+        self.header_list = None
+
     def plot_test(self, report_file):
 
         self.resildual_checkboxes = []
@@ -30,12 +33,28 @@ class Report(object):
 
         cb_container.children = [i for i in row_list]
 
+    def read_data(self, report_file):
+        self.data = get_csv_data(report_file, header=True).dropna(axis=1)
+
+        # Check for restart by
+        restart_file = report_file.rsplit('.csv', 1)[0] + '.restart.csv'
+        if os.path.isfile(restart_file):
+            restart_data = get_csv_data(
+                restart_file, header=True).dropna(axis=1)
+            # Merge restart data with data
+            self.data = pd.concat(
+                [restart_data, self.data], ignore_index=True)
+
+        self.header_list = list(self.data)
+        self.residual_list = []
+        for h in self.header_list:
+            if h.startswith('rho'):
+                append_str = ''
+                # if append_index > 0:
+                #    append_str = '_'+str(append_index)
+                self.residual_list.append(h + append_str)
+
     def plot(self, report_file):
-
-        if not os.path.isfile(report_file):
-            print("File not found: " + str(report_file))
-            return
-
         fig = plt.figure(figsize=(8, 5), dpi=100)
         ax = fig.gca()
         ax.set_yscale("log")
@@ -53,25 +72,11 @@ class Report(object):
                 append_index = 1
 
         for report_file in report_file_list:
-            self.data = get_csv_data(report_file, header=True).dropna(axis=1)
+            if not os.path.isfile(report_file):
+                print("File not found: " + str(report_file))
+                continue
 
-            # Check for restart by
-            restart_file = report_file.rsplit('.csv', 1)[0] + '.restart.csv'
-            if os.path.isfile(restart_file):
-                restart_data = get_csv_data(
-                    restart_file, header=True).dropna(axis=1)
-                # Merge restart data with data
-                self.data = pd.concat(
-                    [restart_data, self.data], ignore_index=True)
-
-            self.header_list = list(self.data)
-            self.residual_list = []
-            for h in self.header_list:
-                if h.startswith('rho'):
-                    append_str = ''
-                    # if append_index > 0:
-                    #    append_str = '_'+str(append_index)
-                    self.residual_list.append(h + append_str)
+            self.read_data(report_file)
 
             y = self.residual_list
             self.data.plot(x='Cycle', y=y, ax=ax, legend=False)
@@ -113,6 +118,9 @@ class Report(object):
 
     def plot_forces(self):
 
+        if self.header_list is None:
+            return
+
         self.checkboxes = []
         cb_container = widgets.VBox()
         display(cb_container)
@@ -136,7 +144,7 @@ class Report(object):
     def plot_performance(self, log_file):
 
         if not os.path.isfile(log_file):
-            print("File not found: " + str(logfile))
+            print("File not found: " + str(log_file))
             return
 
         elapsed_time = []

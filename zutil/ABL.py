@@ -26,6 +26,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 import math
+import numpy as np
 
 
 def coriolis_parameter(latitude_degree):
@@ -34,10 +35,10 @@ def coriolis_parameter(latitude_degree):
     """
     # Earth rotation
     omega = 7.2722e-5  # rad/self
-    return 2.0 * omega * math.sin(math.radians(latitude))
+    return 2.0 * omega * math.sin(math.radians(latitude_degree))
 
 
-def surface_layer_height(friction_velocity, coriolis_parameter):
+def ekman_layer_height(friction_velocity, coriolis_parameter):
     """
     returns the height of the atmospheric boundary layer - Geostrophic height
     For neutral conditions this is the height of the ABL
@@ -45,20 +46,29 @@ def surface_layer_height(friction_velocity, coriolis_parameter):
     return friction_velocity / (6.0 * coriolis_parameter)
 
 
-def friction_velocity(wind_speed, height, roughness_length):
+def friction_velocity(wind_speed, height, roughness_length, kappa=0.41):
     """
     returns the friction velocity
     """
-    return wind_speed * 0.41 / math.log(height / roughness_length)
+    return wind_speed * kappa / math.log(height / roughness_length)
 
 
-def wind_speed(height, friction_velocity, roughness_length):
+def wind_speed(height, friction_velocity, roughness_length, kappa=0.41):
     """
     returns the wind speed at a given height
 
     May want to consider Deaves & Harris (1978) model for high speed wind
     """
-    return friction_velocity / 0.41 * math.log(height / roughness_length)
+    return friction_velocity / kappa * math.log(height / roughness_length)
+
+
+def wind_speed_array(height_array, friction_velocity, roughness_length, kappa=0.41):
+    """
+    returns the wind speed at a given height
+
+    May want to consider Deaves & Harris (1978) model for high speed wind
+    """
+    return friction_velocity / kappa * np.log(height_array / roughness_length)
 
 
 def wind_direction_to_beta(wind_dir_deg):
