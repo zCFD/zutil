@@ -39,11 +39,15 @@ class Report(object):
         # Check for restart by
         restart_file = report_file.rsplit('.csv', 1)[0] + '.restart.csv'
         if os.path.isfile(restart_file):
-            restart_data = get_csv_data(
+            self.restart_data = get_csv_data(
                 restart_file, header=True).dropna(axis=1)
+            # Get first entry in new data
+            restart_cycle = self.data['Cycle'].iloc[0]
+            self.restart_data = self.restart_data[
+                self.restart_data['Cycle'] < restart_cycle]
             # Merge restart data with data
             self.data = pd.concat(
-                [restart_data, self.data], ignore_index=True)
+                [self.restart_data, self.data], ignore_index=True)
 
         self.header_list = list(self.data)
         self.residual_list = []
