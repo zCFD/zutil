@@ -7,6 +7,8 @@ from zutil.plot import display
 from zutil.plot import batch
 from zutil.plot import pd
 
+import numpy as np
+import matplotlib.pyplot as plt
 import os
 
 
@@ -43,8 +45,7 @@ class Report(object):
                 restart_file, header=True).dropna(axis=1)
             # Get first entry in new data
             restart_cycle = self.data['Cycle'].iloc[0]
-            self.restart_data = self.restart_data[
-                self.restart_data['Cycle'] < restart_cycle]
+            self.restart_data = self.restart_data[self.restart_data['Cycle'] <  restart_cycle]
             # Merge restart data with data
             self.data = pd.concat(
                 [self.restart_data, self.data], ignore_index=True)
@@ -57,6 +58,41 @@ class Report(object):
                 # if append_index > 0:
                 #    append_str = '_'+str(append_index)
                 self.residual_list.append(h + append_str)
+
+    def plot_multiple(self, report_file_list, variable_list, out_file):
+
+        fig = plt.figure(figsize=(8, 5), dpi=100)
+
+        handles_ = []
+        for f in report_file_list:
+
+            if not os.path.isfile(f):
+                print("File not found: " + str(f))
+                continue
+
+            case_name = f[:-11]
+
+            vars = []
+            with open(f, 'r') as ff:
+                vars = ff.readline().split()
+
+            data = np.genfromtxt(f, skip_header=1)
+            for v in range(0,len(vars)-2):
+
+                variable_name = vars[v+2]
+                if len(variable_list) != 0 and variable_name not in variable_list:
+                    continue
+                line, = plt.semilogy(data[:,1], data[:,v+2], label=case_name + ' ' + variable_name)
+                handles_.append(line)
+
+        plt.legend(handles = handles_)
+        plt.xlabel('cycles')
+        plt.ylabel('RMS residual')
+        plt.show()
+        if batch:
+            fig.savefig(out_file + ".png", dpi=100)
+        plt.show()
+        self.visible_fig = []
 
     def plot(self, report_file):
         fig = plt.figure(figsize=(8, 5), dpi=100)

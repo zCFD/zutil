@@ -47,13 +47,11 @@ def get_figure(plt, x=8, y=5):
 
 
 def x_label(ax, text):
-    ax.set_xlabel(text, fontsize=ft.axis_font_size,
-                  fontweight='bold', color=cl.zeno_grey)
+    ax.set_xlabel(text, fontsize=ft.axis_font_size, fontweight='bold', color=cl.zeno_grey)
 
 
 def y_label(ax, text):
-    ax.set_ylabel(text, fontsize=ft.axis_font_size,
-                  fontweight='bold', color=cl.zeno_grey)
+    ax.set_ylabel(text, fontsize=ft.axis_font_size, fontweight='bold', color=cl.zeno_grey)
 
 
 def set_title(ax, text):

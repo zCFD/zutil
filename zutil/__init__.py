@@ -241,31 +241,31 @@ def R_2vect(R, vector_orig, vector_fin):
     R[2, 2] = 1.0 + (1.0 - ca) * (z**2 - 1.0)
 
 
-def vector_vector_rotate(vec, axis, origin, theta):
+def vector_vector_rotate(vec,axis,origin,theta):
     # Rotate vector
-    temp = [0.0, 0.0, 0.0]
+    temp = [0.0,0.0,0.0]
 
-    temp[0] = ((origin[0] * (axis[1] * axis[1] + axis[2] * axis[2]) -
-                axis[0] * (origin[1] * axis[1] + origin[2] * axis[2] - dot(axis, vec))) *
-               (1.0 - math.cos(theta)) +
-               vec[0] * math.cos(theta) +
-               (-origin[2] * axis[1] + origin[1] * axis[2] - axis[2] * vec[1] +
-                axis[1] * vec[2]) *
-               math.sin(theta))
-    temp[1] = ((origin[1] * (axis[0] * axis[0] + axis[2] * axis[2]) -
-                axis[1] * (origin[0] * axis[0] + origin[2] * axis[2] - dot(axis, vec))) *
-               (1.0 - math.cos(theta)) +
-               vec[1] * math.cos(theta) +
-               (origin[2] * axis[0] - origin[0] * axis[2] + axis[2] * vec[0] -
-                axis[0] * vec[2]) *
-               math.sin(theta))
-    temp[2] = ((origin[2] * (axis[0] * axis[0] + axis[1] * axis[1]) -
-                axis[2] * (origin[0] * axis[0] + origin[1] * axis[1] - dot(axis, vec))) *
-               (1.0 - math.cos(theta)) +
-               vec[2] * math.cos(theta) +
-               (-origin[1] * axis[0] + origin[0] * axis[1] - axis[1] * vec[0] +
-                axis[0] * vec[1]) *
-               math.sin(theta))
+    temp[0] = ( (origin[0] * (axis[1] * axis[1] + axis[2] * axis[2]) -
+         axis[0] * (origin[1] * axis[1] + origin[2] * axis[2] - dot(axis, vec))) *
+            (1.0 - math.cos(theta)) +
+        vec[0] * math.cos(theta) +
+        (-origin[2] * axis[1] + origin[1] * axis[2] - axis[2] * vec[1] +
+         axis[1] * vec[2]) *
+            math.sin(theta))
+    temp[1] = ( (origin[1] * (axis[0] * axis[0] + axis[2] * axis[2]) -
+         axis[1] * (origin[0] * axis[0] + origin[2] * axis[2] - dot(axis, vec))) *
+            (1.0 - math.cos(theta)) +
+        vec[1] * math.cos(theta) +
+        (origin[2] * axis[0] - origin[0] * axis[2] + axis[2] * vec[0] -
+         axis[0] * vec[2]) *
+            math.sin(theta) )
+    temp[2] = ( (origin[2] * (axis[0] * axis[0] + axis[1] * axis[1]) -
+         axis[2] * (origin[0] * axis[0] + origin[1] * axis[1] - dot(axis, vec))) *
+            (1.0 - math.cos(theta)) +
+        vec[2] * math.cos(theta) +
+        (-origin[1] * axis[0] + origin[0] * axis[1] - axis[1] * vec[0] +
+         axis[0] * vec[1]) *
+            math.sin(theta) )
 
     return temp
 
@@ -305,8 +305,7 @@ def create_turbine_segments_simple(turbine_zone_dict, u_ref, density, turbine_na
     rotor_swept_area = (math.pi * ro * ro) - (math.pi * ri * ri)
 
     tc = np.interp(u_ref,
-                   np.array(turbine_zone_dict[
-                            'thrust coefficient curve']).T[0],
+                   np.array(turbine_zone_dict['thrust coefficient curve']).T[0],
                    np.array(turbine_zone_dict['thrust coefficient curve']).T[1])
 
     ts = np.interp(u_ref,
@@ -378,8 +377,7 @@ def create_turbine_segments_simple_nonuniform(turbine_zone_dict, u_ref, density,
     rotor_swept_area = (math.pi * ro * ro) - (math.pi * ri * ri)
 
     tc = np.interp(u_ref,
-                   np.array(turbine_zone_dict[
-                            'thrust coefficient curve']).T[0],
+                   np.array(turbine_zone_dict['thrust coefficient curve']).T[0],
                    np.array(turbine_zone_dict['thrust coefficient curve']).T[1])
 
     ts = np.interp(u_ref,
@@ -469,8 +467,7 @@ def create_turbine_segments(thrust_coefficient, blade_inner_location,
         print 'Resetting thrust coefficient to 0.8'
         thrust_coefficient = 0.8
 
-    area = (math.pi * radius_outer * radius_outer) - \
-        math.pi * radius_inner * radius_inner
+    area = (math.pi * radius_outer * radius_outer) - math.pi * radius_inner * radius_inner
     total_thrust = 0.5 * area * density * u_inf * u_inf * thrust_coefficient
 
     induction_factor = (4.0 - math.sqrt(4.0 * 4.0 - 4.0 *
@@ -592,8 +589,7 @@ def convolution(disc, disc_centre, disc_radius, disc_normal, disc_up,
     thrust_check_array = np.array([thrust_check])
     thrust_check_total_array = np.array([0.0])
 
-    MPI.COMM_WORLD.Allreduce(
-        thrust_check_array, thrust_check_total_array, op=MPI.SUM)
+    MPI.COMM_WORLD.Allreduce(thrust_check_array, thrust_check_total_array, op=MPI.SUM)
     thrust_check_total = thrust_check_total_array[0]
     thrust_check = thrust_check_total
 
@@ -618,8 +614,7 @@ def convolution(disc, disc_centre, disc_radius, disc_normal, disc_up,
         #    print 'Scaling thrust: ', thrust_factor
         cell_force_scaled = []
         for cell in range(len(cell_force) / 3):
-            cell_force_scaled.append((cell_force[cell * 3 + 0] * thrust_factor, cell_force[
-                                     cell * 3 + 1] * thrust_factor, cell_force[cell * 3 + 2] * thrust_factor))
+            cell_force_scaled.append((cell_force[cell * 3 + 0] * thrust_factor, cell_force[cell * 3 + 1] * thrust_factor, cell_force[cell * 3 + 2] * thrust_factor))
         return cell_force_scaled
     else:
         cell_force = ndarray.tolist(cell_force)
