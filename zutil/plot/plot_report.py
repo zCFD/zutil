@@ -34,13 +34,13 @@ class Report(object):
         cb_container.children = [i for i in row_list]
 
     def read_data(self, report_file):
-        self.data = get_csv_data(report_file, header=True).dropna(axis=1)
+        self.data = get_csv_data(report_file, header=True).dropna(axis=1,how='all')
 
         # Check for restart by
         restart_file = report_file.rsplit('.csv', 1)[0] + '.restart.csv'
         if os.path.isfile(restart_file):
             self.restart_data = get_csv_data(
-                restart_file, header=True).dropna(axis=1)
+                restart_file, header=True).dropna(axis=1,how='all')
             # Get first entry in new data
             restart_cycle = self.data['Cycle'].iloc[0]
             self.restart_data = self.restart_data[
@@ -85,6 +85,9 @@ class Report(object):
             y = self.residual_list
             self.data.plot(x='Cycle', y=y, ax=ax, legend=False)
             append_index = append_index + 1
+
+        # Turn on major and minor grid lines
+        ax.grid(True,'both')
 
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
