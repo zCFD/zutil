@@ -191,10 +191,10 @@ class Report(object):
 
     def plot_forces(self,mean=100):
 
-    # Need to disable autoscroll
-    autoscroll(-1)
-
-    self.rolling_avg = mean
+        # Need to disable autoscroll
+        autoscroll(-1)
+    
+        self.rolling_avg = mean
 
         if self.header_list is None:
             return
