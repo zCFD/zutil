@@ -11,11 +11,31 @@ import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+from IPython.display import Javascript
+def autoscroll(threshhold):
+    if threshhold==0:  # alway scroll !not good
+        javastring = '''
+        IPython.OutputArea.prototype._should_scroll = function(lines) {
+            return true;
+        }
+        '''
+    elif threshhold==-1:  # never scroll !not good
+        javastring = '''
+        IPython.OutputArea.prototype._should_scroll = function(lines) {
+            return false;
+        }
+        '''
+    else:
+        javastring = 'IPython.OutputArea.auto_scroll_threshold = ' + str(threshhold)
+    display(Javascript(javastring))
 
 class Report(object):
 
     def __init__(self):
         self.header_list = None
+        self.cb_container = None
+        self.button = None
+        self.rolling_avg = 100
 
     def plot_test(self, report_file):
 
@@ -49,6 +69,9 @@ class Report(object):
             # Merge restart data with data
             self.data = pd.concat(
                 [self.restart_data, self.data], ignore_index=True)
+
+        if self.append_index > 0:
+            self.data = self.data.add_suffix('_'+str(self.append_index))
 
         self.header_list = list(self.data)
         self.residual_list = []
@@ -102,14 +125,14 @@ class Report(object):
         ax.set_xlabel('cycles')
         ax.set_ylabel('RMS residual')
 
-        append_index = 0
+        self.append_index = 0
         if not isinstance(report_file, list):
             report_file_list = [report_file]
             ax.set_title(report_file[:report_file.rindex('_report.csv')])
         else:
             report_file_list = report_file
             if len(report_file_list) > 1:
-                append_index = 1
+                self.append_index = 1
 
         for report_file in report_file_list:
             if not os.path.isfile(report_file):
@@ -119,8 +142,12 @@ class Report(object):
             self.read_data(report_file)
 
             y = self.residual_list
+            x = 'Cycle'
+            if self.append_index > 0:
+                x = x+'_'+str(self.append_index)
+            self.data.plot(x=x, y=y, ax=ax, legend=False)
             self.data.plot(x='Cycle', y=y, ax=ax, legend=False)
-            append_index = append_index + 1
+            self.append_index = self.append_index + 1
 
         # Turn on major and minor grid lines
         ax.grid(True,'both')
@@ -136,53 +163,70 @@ class Report(object):
     def plot_data(self, b):
 
         # Delete visbible figures
-        for f in self.visible_fig:
-            f.clear()
-            plt.close(f)
-            plt.gcf()
-        dp.clear_output(wait=True)
+        #for f in self.visible_fig:
+        #    f.clear()
+        #    plt.close(f)
+        #    plt.gcf()
+        #dp.clear_output(wait=True)
+        self.rolling_avg = self.rolling.value
+        self.out.clear_output()
+        with self.out:
+            rolling = self.data.rolling(self.rolling_avg).mean()
+            for cb in self.checkboxes:
+                if cb.value:
+                    h = cb.description
+                    fig = plt.figure()
+                    ax = fig.gca()
+                    y = h
+                    self.data.plot(x='Cycle', y=y, ax=ax, legend=False)
+                    rolling.plot(x=self.data['Cycle'], y=y, ax=ax, legend=0)
+                    last_val = self.data[h].tail(1).get_values()
+                    ax.set_title(str(h) + ' - ' + str(last_val))
+                    ax.grid(True)
+                    ax.set_xlabel('cycles')
+                    ax.set_ylabel(h)
+                    self.visible_fig.append(fig)
+            #plt.show()
+            #display(plt)
 
-        rolling = self.data.rolling(100).mean()
-        for cb in self.checkboxes:
-            if cb.value:
-                h = cb.description
-                fig = plt.figure()
-                ax = fig.gca()
-                y = h
-                self.data.plot(x='Cycle', y=y, ax=ax, legend=False)
-                rolling.plot(x=self.data['Cycle'], y=y, ax=ax, legend=0)
-                last_val = self.data[h].tail(1).get_values()
-                ax.set_title(str(h) + ' - ' + str(last_val))
-                ax.grid(True)
-                ax.set_xlabel('cycles')
-                ax.set_ylabel(h)
-                self.visible_fig.append(fig)
-        plt.show()
+    def plot_forces(self,mean=100):
 
-    def plot_forces(self):
+    # Need to disable autoscroll
+    autoscroll(-1)
+
+    self.rolling_avg = mean
 
         if self.header_list is None:
             return
 
-        self.checkboxes = []
-        cb_container = widgets.VBox()
-        display(cb_container)
-        for h in self.header_list:
-            if h not in self.residual_list and h not in ['RealTimeStep', 'Cycle']:
-                self.checkboxes.append(widgets.Checkbox(
-                    description=h, value=False, width=90))
+        if self.cb_container is None:
+            self.out = widgets.Output()
+            self.checkboxes = []
+            self.cb_container = widgets.VBox()
+            for h in self.header_list:
+                if h not in self.residual_list and h not in ['RealTimeStep', 'Cycle']:
+                    self.checkboxes.append(widgets.Checkbox(
+                        description=h, value=False, width=90))
 
-        row_list = []
-        for i in range(0, len(self.checkboxes), 3):
-            row = widgets.HBox()
-            row.children = self.checkboxes[i:i + 3]
-            row_list.append(row)
+            row_list = []
+            for i in range(0, len(self.checkboxes), 3):
+                row = widgets.HBox()
+                row.children = self.checkboxes[i:i + 3]
+                row_list.append(row)
 
-        cb_container.children = [i for i in row_list]
+            self.cb_container.children = [i for i in row_list]
 
-        button = widgets.Button(description="Update plots")
-        button.on_click(self.plot_data)
-        display(button)
+            self.rolling = widgets.IntSlider(value=self.rolling_avg,min=1,max=1000,step=1,
+                                             description='Rolling Average:')
+
+            self.button = widgets.Button(description="Update plots")
+            self.button.on_click(self.plot_data)
+
+        display(self.out)
+        display(self.cb_container)
+        display(self.rolling)
+        display(self.button)
+
 
     def plot_performance(self, log_file):
 
