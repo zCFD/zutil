@@ -726,7 +726,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     tpc_string = '['  # Turbine Power Curve
                     for wp in turbine_dict['DataTable'].keys():
                         # Allow velocities to be shifted by user specified calibration
-                        wsc[0][wp] = float(turbine_dict['DataTable'][wp]['WindSpeed']) + calibration_offset
+                        wsc[0][wp] = float(turbine_dict['DataTable'][wp]['WindSpeed']) - calibration_offset
                         wsc[1][wp] = turbine_dict['DataTable'][wp]['ThrustCoEfficient']
                         wsc[2][wp] = turbine_dict['DataTable'][wp]['RotorSpeed']
                         wsc[3][wp] = turbine_dict['DataTable'][wp]['PowerOutput']
