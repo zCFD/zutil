@@ -146,7 +146,6 @@ class Report(object):
             if self.append_index > 0:
                 x = x+'_'+str(self.append_index)
             self.data.plot(x=x, y=y, ax=ax, legend=False)
-            self.data.plot(x='Cycle', y=y, ax=ax, legend=False)
             self.append_index = self.append_index + 1
 
         # Turn on major and minor grid lines
@@ -193,7 +192,7 @@ class Report(object):
 
         # Need to disable autoscroll
         autoscroll(-1)
-    
+
         self.rolling_avg = mean
 
         if self.header_list is None:
