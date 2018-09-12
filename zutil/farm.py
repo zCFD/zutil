@@ -614,6 +614,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                            model='induction',  # options are (induction, simple)
                            turbine_files=[['xyz_location_file1.txt', 'turbine_type1.trbx'],
                                           ['xyz_location_file2.txt', 'turbine_type2.trbx']],
+                           calibration_offset=0.0,
                            **kwargs):
 
     # Ensure turbine folder exists
@@ -724,7 +725,8 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     tsc_string = '['  # Tip speed ratio curve
                     tpc_string = '['  # Turbine Power Curve
                     for wp in turbine_dict['DataTable'].keys():
-                        wsc[0][wp] = turbine_dict['DataTable'][wp]['WindSpeed']
+                        # Allow velocities to be shifted by user specified calibration
+                        wsc[0][wp] = float(turbine_dict['DataTable'][wp]['WindSpeed']) + calibration_offset
                         wsc[1][wp] = turbine_dict['DataTable'][wp]['ThrustCoEfficient']
                         wsc[2][wp] = turbine_dict['DataTable'][wp]['RotorSpeed']
                         wsc[3][wp] = turbine_dict['DataTable'][wp]['PowerOutput']
