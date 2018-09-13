@@ -9,7 +9,7 @@ setup(name="zutil",
       packages=["zutil", "zutil.post", "zutil.analysis", "zutil.plot"],
       install_requires=[
           'mpi4py',
-          'ipython',
+          'ipython<6.0',
           'Fabric',
           'ipywidgets',
           'matplotlib',
