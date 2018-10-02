@@ -141,11 +141,12 @@ class Report(object):
 
             self.read_data(report_file)
 
-            y = self.residual_list
+            #y = self.residual_list
             x = 'Cycle'
             if self.append_index > 0:
                 x = x+'_'+str(self.append_index)
-            self.data.plot(x=x, y=y, ax=ax, legend=False)
+            for y in self.residual_list:
+                self.data.plot(x=x, y=y, ax=ax, legend=False)
             self.append_index = self.append_index + 1
 
         # Turn on major and minor grid lines
@@ -180,7 +181,14 @@ class Report(object):
                     self.data.plot(x='Cycle', y=y, ax=ax, legend=False)
                     rolling.plot(x=self.data['Cycle'], y=y, ax=ax, legend=0)
                     last_val = self.data[h].tail(1).get_values()
-                    ax.set_title(str(h) + ' - ' + str(last_val))
+                    # $\downarrow$ $\uparrow$ $\leftrightarrow$
+                    rolling_grad = rolling[h].tail(2).get_values()[0] - rolling[h].tail(2).get_values()[1]
+                    trend = r'$\leftrightarrow$'
+                    if rolling_grad > 0.0:
+                        trend = r'$\downarrow$'
+                    elif rolling_grad < 0.0:
+                        trend = r'$\uparrow$'
+                    ax.set_title(str(h) + ' - ' + str(last_val) + ' ' + trend)
                     ax.grid(True)
                     ax.set_xlabel('cycles')
                     ax.set_ylabel(h)
