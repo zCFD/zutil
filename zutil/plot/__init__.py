@@ -33,6 +33,12 @@ else:
 from IPython.display import display
 from IPython.core.pylabtools import figsize, getfigs
 
+# To run scripts written for ParaView 4.0 in newer versions, you can use the
+# following.
+import paraview
+paraview.compatibility.major = 5
+paraview.compatibility.minor = 4
+
 from paraview.simple import *
 paraview.simple._DisableFirstRenderCameraReset()
 
