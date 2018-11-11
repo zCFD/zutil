@@ -492,6 +492,7 @@ def report_data_reader(name, arr1, arr2):
         print 'farm.py : report_data_reader : multiple columns in data results file for ' + name + ' ' + len(idx[0].flat)
     return var
 
+
 min_dist = 1.0e16
 closest_point = [min_dist, min_dist, min_dist]
 
@@ -687,9 +688,9 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     closest_point = [min_dist, min_dist, min_dist]
                     if local_surface is not None:
                         pid = pointLocator.FindClosestPoint([
-                                      easting, northing, 0.0])
+                            easting, northing, 0.0])
                         closest_point = local_surface.GetPoint(pid)
-                        #post.for_each(local_surface, closest_point_func, s=[
+                        # post.for_each(local_surface, closest_point_func, s=[
                         #              easting, northing, 0.0])
                         height = closest_point[2]
                         hub_z = height + float(turbine_dict['SelectedHeight'])

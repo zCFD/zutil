@@ -12,14 +12,16 @@ import matplotlib.pyplot as plt
 import os
 
 from IPython.display import Javascript
+
+
 def autoscroll(threshhold):
-    if threshhold==0:  # alway scroll !not good
+    if threshhold == 0:  # alway scroll !not good
         javastring = '''
         IPython.OutputArea.prototype._should_scroll = function(lines) {
             return true;
         }
         '''
-    elif threshhold==-1:  # never scroll !not good
+    elif threshhold == -1:  # never scroll !not good
         javastring = '''
         IPython.OutputArea.prototype._should_scroll = function(lines) {
             return false;
@@ -28,6 +30,7 @@ def autoscroll(threshhold):
     else:
         javastring = 'IPython.OutputArea.auto_scroll_threshold = ' + str(threshhold)
     display(Javascript(javastring))
+
 
 class Report(object):
 
@@ -56,22 +59,22 @@ class Report(object):
         cb_container.children = [i for i in row_list]
 
     def read_data(self, report_file):
-        self.data = get_csv_data(report_file, header=True).dropna(axis=1,how='all')
+        self.data = get_csv_data(report_file, header=True).dropna(axis=1, how='all')
 
         # Check for restart by
         restart_file = report_file.rsplit('.csv', 1)[0] + '.restart.csv'
         if os.path.isfile(restart_file):
             self.restart_data = get_csv_data(
-                restart_file, header=True).dropna(axis=1,how='all')
+                restart_file, header=True).dropna(axis=1, how='all')
             # Get first entry in new data
             restart_cycle = self.data['Cycle'].iloc[0]
-            self.restart_data = self.restart_data[self.restart_data['Cycle'] <  restart_cycle]
+            self.restart_data = self.restart_data[self.restart_data['Cycle'] < restart_cycle]
             # Merge restart data with data
             self.data = pd.concat(
                 [self.restart_data, self.data], ignore_index=True)
 
         if self.append_index > 0:
-            self.data = self.data.add_suffix('_'+str(self.append_index))
+            self.data = self.data.add_suffix('_' + str(self.append_index))
 
         self.header_list = list(self.data)
         self.residual_list = []
@@ -100,15 +103,15 @@ class Report(object):
                 vars = ff.readline().split()
 
             data = np.genfromtxt(f, skip_header=1)
-            for v in range(0,len(vars)-2):
+            for v in range(0, len(vars) - 2):
 
-                variable_name = vars[v+2]
+                variable_name = vars[v + 2]
                 if len(variable_list) != 0 and variable_name not in variable_list:
                     continue
-                line, = plt.semilogy(data[:,1], data[:,v+2], label=case_name + ' ' + variable_name)
+                line, = plt.semilogy(data[:, 1], data[:, v + 2], label=case_name + ' ' + variable_name)
                 handles_.append(line)
 
-        plt.legend(handles = handles_)
+        plt.legend(handles=handles_)
         plt.xlabel('cycles')
         plt.ylabel('RMS residual')
         plt.show()
@@ -144,13 +147,13 @@ class Report(object):
             #y = self.residual_list
             x = 'Cycle'
             if self.append_index > 0:
-                x = x+'_'+str(self.append_index)
+                x = x + '_' + str(self.append_index)
             for y in self.residual_list:
                 self.data.plot(x=x, y=y, ax=ax, legend=False)
             self.append_index = self.append_index + 1
 
         # Turn on major and minor grid lines
-        ax.grid(True,'both')
+        ax.grid(True, 'both')
 
         box = ax.get_position()
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
@@ -163,11 +166,11 @@ class Report(object):
     def plot_data(self, b):
 
         # Delete visbible figures
-        #for f in self.visible_fig:
+        # for f in self.visible_fig:
         #    f.clear()
         #    plt.close(f)
         #    plt.gcf()
-        #dp.clear_output(wait=True)
+        # dp.clear_output(wait=True)
         self.rolling_avg = self.rolling.value
         self.out.clear_output()
         with self.out:
@@ -193,10 +196,10 @@ class Report(object):
                     ax.set_xlabel('cycles')
                     ax.set_ylabel(h)
                     self.visible_fig.append(fig)
-            #plt.show()
-            #display(plt)
+            # plt.show()
+            # display(plt)
 
-    def plot_forces(self,mean=100):
+    def plot_forces(self, mean=100):
 
         # Need to disable autoscroll
         autoscroll(-1)
@@ -223,7 +226,7 @@ class Report(object):
 
             self.cb_container.children = [i for i in row_list]
 
-            self.rolling = widgets.IntSlider(value=self.rolling_avg,min=1,max=1000,step=1,
+            self.rolling = widgets.IntSlider(value=self.rolling_avg, min=1, max=1000, step=1,
                                              description='Rolling Average:')
 
             self.button = widgets.Button(description="Update plots")
@@ -233,7 +236,6 @@ class Report(object):
         display(self.cb_container)
         display(self.rolling)
         display(self.button)
-
 
     def plot_performance(self, log_file):
 

@@ -986,7 +986,7 @@ def get_status_dict(case_name, **kwargs):
                     return None
         except Exception, e:
             print 'WARNING: ' + case_name + '_status.txt file not found'
-            print 'Caught exception '+str(e)
+            print 'Caught exception ' + str(e)
             return None
 
 
@@ -1057,6 +1057,7 @@ def print_html_parameters(parameters):
                                    'speed': speed,
                                    'mach': mach,
                                    })
+
 
 import uuid
 import time

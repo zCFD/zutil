@@ -9,6 +9,7 @@ def invalid_definition(definition):
     print definition
     raise
 
+
 # Dictionary of validation cases
 validation_dict = collections.OrderedDict()
 

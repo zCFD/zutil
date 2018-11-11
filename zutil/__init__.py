@@ -241,31 +241,31 @@ def R_2vect(R, vector_orig, vector_fin):
     R[2, 2] = 1.0 + (1.0 - ca) * (z**2 - 1.0)
 
 
-def vector_vector_rotate(vec,axis,origin,theta):
+def vector_vector_rotate(vec, axis, origin, theta):
     # Rotate vector
-    temp = [0.0,0.0,0.0]
+    temp = [0.0, 0.0, 0.0]
 
-    temp[0] = ( (origin[0] * (axis[1] * axis[1] + axis[2] * axis[2]) -
-         axis[0] * (origin[1] * axis[1] + origin[2] * axis[2] - dot(axis, vec))) *
-            (1.0 - math.cos(theta)) +
-        vec[0] * math.cos(theta) +
-        (-origin[2] * axis[1] + origin[1] * axis[2] - axis[2] * vec[1] +
-         axis[1] * vec[2]) *
-            math.sin(theta))
-    temp[1] = ( (origin[1] * (axis[0] * axis[0] + axis[2] * axis[2]) -
-         axis[1] * (origin[0] * axis[0] + origin[2] * axis[2] - dot(axis, vec))) *
-            (1.0 - math.cos(theta)) +
-        vec[1] * math.cos(theta) +
-        (origin[2] * axis[0] - origin[0] * axis[2] + axis[2] * vec[0] -
-         axis[0] * vec[2]) *
-            math.sin(theta) )
-    temp[2] = ( (origin[2] * (axis[0] * axis[0] + axis[1] * axis[1]) -
-         axis[2] * (origin[0] * axis[0] + origin[1] * axis[1] - dot(axis, vec))) *
-            (1.0 - math.cos(theta)) +
-        vec[2] * math.cos(theta) +
-        (-origin[1] * axis[0] + origin[0] * axis[1] - axis[1] * vec[0] +
-         axis[0] * vec[1]) *
-            math.sin(theta) )
+    temp[0] = ((origin[0] * (axis[1] * axis[1] + axis[2] * axis[2]) -
+                axis[0] * (origin[1] * axis[1] + origin[2] * axis[2] - dot(axis, vec))) *
+               (1.0 - math.cos(theta)) +
+               vec[0] * math.cos(theta) +
+               (-origin[2] * axis[1] + origin[1] * axis[2] - axis[2] * vec[1] +
+                axis[1] * vec[2]) *
+               math.sin(theta))
+    temp[1] = ((origin[1] * (axis[0] * axis[0] + axis[2] * axis[2]) -
+                axis[1] * (origin[0] * axis[0] + origin[2] * axis[2] - dot(axis, vec))) *
+               (1.0 - math.cos(theta)) +
+               vec[1] * math.cos(theta) +
+               (origin[2] * axis[0] - origin[0] * axis[2] + axis[2] * vec[0] -
+                axis[0] * vec[2]) *
+               math.sin(theta))
+    temp[2] = ((origin[2] * (axis[0] * axis[0] + axis[1] * axis[1]) -
+                axis[2] * (origin[0] * axis[0] + origin[1] * axis[1] - dot(axis, vec))) *
+               (1.0 - math.cos(theta)) +
+               vec[2] * math.cos(theta) +
+               (-origin[1] * axis[0] + origin[0] * axis[1] - axis[1] * vec[0] +
+                axis[0] * vec[1]) *
+               math.sin(theta))
 
     return temp
 
