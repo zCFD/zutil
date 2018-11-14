@@ -13,7 +13,6 @@ sh = logging.StreamHandler()
 sh.setLevel(logging.DEBUG)
 log.addHandler(sh)
 
-import sys
 import multiprocessing as mp
 from multiprocessing import Process, Value
 process_id = None

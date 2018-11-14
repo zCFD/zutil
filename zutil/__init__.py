@@ -27,7 +27,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import math
 import sys
-import os
+from os import path
 import numpy as np
 
 
@@ -44,7 +44,7 @@ def include(filename):
     include a file by executing it. This imports everything including
     variables into the calling module
     """
-    if os.path.exists(filename):
+    if path.exists(filename):
         execfile(filename)
 
 
@@ -64,7 +64,7 @@ def get_zone_info(module_name):
 def get_default_zone_info():
     import inspect
     _, filename, linenumber, _, _, _ = inspect.stack()[1]
-    return get_zone_info(os.path.split(os.path.splitext(filename)[0])[1] +
+    return get_zone_info(path.split(path.splitext(filename)[0])[1] +
                          '_zone')
 
 
