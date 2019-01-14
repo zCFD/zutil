@@ -824,7 +824,7 @@ def extract_probe_data(case_name='windfarm',
 
 
 def generate_mesh_pts():
-    start = 2.0
+    start = 0.001
     max_height = 20000
     growth_rate = 1.3
 
