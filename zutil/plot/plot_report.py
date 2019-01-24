@@ -73,8 +73,8 @@ class Report(object):
             self.data = pd.concat(
                 [self.restart_data, self.data], ignore_index=True)
 
-        if self.append_index > 0:
-            self.data = self.data.add_suffix('_' + str(self.append_index))
+        # if self.append_index > 0:
+        #    self.data = self.data.add_suffix('_' + str(self.append_index))
 
         self.header_list = list(self.data)
         self.residual_list = []
