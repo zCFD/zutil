@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name="zutil",
-      version='0.1.6',
+      version='0.2.0',
       description="Utilities used for generating zCFD control dictionaries",
       author="Zenotech",
       author_email="support@zenotech.com",
@@ -12,6 +12,7 @@ setup(name="zutil",
       },
       packages=["zutil", "zutil.post", "zutil.analysis", "zutil.plot"],
       install_requires=[
+          'future',
           'ipython<6.0',
           'Fabric',
           'ipywidgets',

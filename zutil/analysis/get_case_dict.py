@@ -48,7 +48,7 @@ def get_case_dict(default_test_file='generic.zcfd-test.yml'):
         invalid_definition(test_definition)
 
     for step in test_definition:
-        if len(step.keys()) > 1:
+        if len(list(step.keys())) > 1:
             invalid_definition(test_definition)
 
         for key in step:

@@ -1,4 +1,7 @@
 from __future__ import print_function
+from builtins import str
+from builtins import range
+from builtins import object
 from zutil.post import get_csv_data
 import ipywidgets.widgets as widgets
 from IPython import display as dp

@@ -26,6 +26,10 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 from __future__ import print_function
 from __future__ import absolute_import
+from __future__ import division
+from builtins import str
+from builtins import range
+from past.utils import old_div
 import math
 import ast
 import sys
@@ -60,7 +64,7 @@ def create_mesh_sources(array_data_file, farm_centre, turbine_only=False):
     # Cases
     cases = array_data['Cases']
 
-    for (key, value) in cases.items():
+    for (key, value) in list(cases.items()):
         # print key
 
         # Wind direction
@@ -72,7 +76,7 @@ def create_mesh_sources(array_data_file, farm_centre, turbine_only=False):
         # List of tuples
         mesh_source_location = []
 
-        for (key, value) in turbines.items():
+        for (key, value) in list(turbines.items()):
             # print key
             name = key
             if isinstance(key, int):
@@ -147,7 +151,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
     # Cases
     cases = array_data['Cases']
 
-    for (key, value) in cases.items():
+    for (key, value) in list(cases.items()):
         # print key
 
         # Wind direction
@@ -159,7 +163,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
         # List of tuples
         location = []
 
-        for (key, value) in turbines.items():
+        for (key, value) in list(turbines.items()):
             # print key
             name = key
             if isinstance(key, int):
@@ -201,7 +205,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
             # Point turbine into the wind
             turbine_normal = [-u, -v, 0.0]
             mag = math.sqrt(sum(x**2 for x in turbine_normal))
-            turbine_normal = [-u / mag, -v / mag, 0.0]
+            turbine_normal = [old_div(-u, mag), old_div(-v, mag), 0.0]
 
             generate_turbine(name, turbine_location,
                              turbine_diameter, wind_direction, True)
@@ -233,7 +237,7 @@ def create_zcfd_input(array_data_file, farm_centre):
     # Cases
     cases = array_data['Cases']
 
-    for (key, value) in cases.items():
+    for (key, value) in list(cases.items()):
         # print key
 
         # Wind direction
@@ -250,7 +254,7 @@ def create_zcfd_input(array_data_file, farm_centre):
         # List of tuples
         location = []
 
-        for (key, value) in turbines.items():
+        for (key, value) in list(turbines.items()):
             # print key
             name = key
             if isinstance(key, int):
@@ -390,7 +394,7 @@ def create_source(turbine_location, diameter):
     # Radius
     radius = 0.5 * diameter * radial_factor
     # Mesh size
-    mesh_size = diameter / diameter_mesh_pts
+    mesh_size = old_div(diameter, diameter_mesh_pts)
 
     return ((pt_1, turbine_location[1], turbine_location[2], mesh_size, radius, radius * radius_factor),
             (pt_2, turbine_location[1], turbine_location[2], mesh_size, radius, radius * radius_factor))
@@ -721,13 +725,13 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     tz.write('\'name\': \'' + name + '\',\n')
                     tz.write('\'def\':\'' + directory + name +
                              '-' + str(wind_direction) + '.vtp\',\n')
-                    if (len(turbine_dict['DataTable'].keys()) == 0):
+                    if (len(list(turbine_dict['DataTable'].keys())) == 0):
                         print('WARNING: Windspeed DataTable empty - using Reference Wind Speed = ' + str(reference_wind_speed))
-                    wsc = np.zeros((4, len(turbine_dict['DataTable'].keys())))
+                    wsc = np.zeros((4, len(list(turbine_dict['DataTable'].keys()))))
                     tcc_string = '['  # Thrust coefficient curve
                     tsc_string = '['  # Tip speed ratio curve
                     tpc_string = '['  # Turbine Power Curve
-                    for wp in turbine_dict['DataTable'].keys():
+                    for wp in list(turbine_dict['DataTable'].keys()):
                         # Allow velocities to be shifted by user specified calibration
                         wsc[0][wp] = float(turbine_dict['DataTable'][wp]['WindSpeed']) - calibration_offset
                         wsc[1][wp] = turbine_dict['DataTable'][wp]['ThrustCoEfficient']
@@ -735,7 +739,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         wsc[3][wp] = turbine_dict['DataTable'][wp]['PowerOutput']
                         tcc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[1][wp]) + '],'
                         tsc_string += '[' + str(wsc[0][wp]) + ',' + str(
-                            ((wsc[2][wp] * math.pi / 30.0) * rd / 2.0) / max(wsc[0][wp], 1.0)) + '],'
+                            old_div(((wsc[2][wp] * math.pi / 30.0) * rd / 2.0), max(wsc[0][wp], 1.0))) + '],'
                         tpc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[3][wp]) + '],'
                     tcc_string += ']'
                     tsc_string += ']'
@@ -749,7 +753,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
 
                     rs = np.interp(reference_wind_speed, wsc[0], wsc[2])
                     # The rotor speed is in revolutions per minute, so convert to tip speed ratio
-                    tsr = ((rs * math.pi / 30.0) * rd / 2.0) / reference_wind_speed
+                    tsr = old_div(((rs * math.pi / 30.0) * rd / 2.0), reference_wind_speed)
                     tz.write('\'tip speed ratio\':' + str(tsr) + ',\n')
                     tz.write('\'tip speed ratio curve\':' + tsc_string + ',\n')
 
@@ -867,16 +871,16 @@ def create_profile(profile_name, hub_height, hub_height_vel, direction, roughnes
     vel = ABL.wind_speed_array(pts, utau, roughness, kappa)
 
     if scale_k:
-        k_scale = (np.ones(len(pts)) - np.minimum(np.ones(len(pts)), pts / geostrophic_plane))**2
+        k_scale = (np.ones(len(pts)) - np.minimum(np.ones(len(pts)), old_div(pts, geostrophic_plane)))**2
     else:
         k_scale = np.ones(len(pts))
 
-    k = k_scale * (utau**2) / math.sqrt(cmu)
-    eps = np.ones(len(pts)) * (utau**3) / (kappa * (pts + roughness))
+    k = old_div(k_scale * (utau**2), math.sqrt(cmu))
+    eps = old_div(np.ones(len(pts)) * (utau**3), (kappa * (pts + roughness)))
     # Note this mut/mu
-    mut = rho * cmu * k**2 / (eps * mu)
-    TI = (2 * k / 3)**0.5 / vel
-    lengthscale = cmu**0.75 * k**1.5 / eps
+    mut = old_div(rho * cmu * k**2, (eps * mu))
+    TI = old_div((old_div(2 * k, 3))**0.5, vel)
+    lengthscale = old_div(cmu**0.75 * k**1.5, eps)
 
     du_dz = np.gradient(vel, pts, edge_order=2)
 

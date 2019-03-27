@@ -1,5 +1,7 @@
 from __future__ import print_function
 
+from builtins import str
+from builtins import range
 from paraview.simple import *
 
 from fabric.api import (env, run, cd, get, hide, settings,
