@@ -1,3 +1,4 @@
+from __future__ import absolute_import
 import numpy as np
 import matplotlib
 import os
@@ -42,10 +43,10 @@ paraview.compatibility.minor = 4
 from paraview.simple import *
 paraview.simple._DisableFirstRenderCameraReset()
 
-import font as ft
-import colour as cl
+from . import font as ft
+from . import colour as cl
 
-from plot_report import Report
+from .plot_report import Report
 
 
 def get_figure(plt, x=8, y=5):

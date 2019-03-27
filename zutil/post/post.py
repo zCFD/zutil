@@ -1,6 +1,7 @@
 """ Helper functions for accessing Paraview functionality
 .. moduleauthor:: Zenotech Ltd
 """
+from __future__ import print_function
 from paraview.simple import *
 # from paraview.vtk.util import numpy_support
 try:
@@ -395,7 +396,7 @@ def get_monitor_data(file, monitor_name, var_name):
         index = names.index(str(monitor_name) + "_" + str(var_name))
         return (data[names[0]], data[names[index]])
     else:
-        print 'POST.PY: MONITOR POINT: ' + str(monitor_name) + "_" + str(var_name) + ' NOT FOUND'
+        print('POST.PY: MONITOR POINT: ' + str(monitor_name) + "_" + str(var_name) + ' NOT FOUND')
 
 
 def residual_plot(file, pl):
@@ -933,16 +934,16 @@ def get_case_parameters_str(case_name, **kwargs):
                     # print status_file_str
                     return case_file_str
                 else:
-                    print 'WARNING: ' + case_name + '.py file not found'
+                    print('WARNING: ' + case_name + '.py file not found')
                     return None
         except:
-            print 'WARNING: ' + case_name + '.py file not found'
+            print('WARNING: ' + case_name + '.py file not found')
             return None
 
 
 def get_case_parameters(case_name, **kwargs):
     case_file_str = get_case_parameters_str(case_name, **kwargs)
-    exec case_file_str
+    exec(case_file_str)
     return parameters
 
 
@@ -970,7 +971,7 @@ def get_status_dict(case_name, **kwargs):
             # print status_file_str
             return json.loads(status_file_str)
         else:
-            print 'WARNING: ' + case_name + '_status.txt file not found'
+            print('WARNING: ' + case_name + '_status.txt file not found')
             return None
     else:
         try:
@@ -982,11 +983,11 @@ def get_status_dict(case_name, **kwargs):
                     # print status_file_str
                     return json.loads(status_file_str)
                 else:
-                    print 'WARNING: ' + case_name + '_status.txt file not found'
+                    print('WARNING: ' + case_name + '_status.txt file not found')
                     return None
-        except Exception, e:
-            print 'WARNING: ' + case_name + '_status.txt file not found'
-            print 'Caught exception ' + str(e)
+        except Exception as e:
+            print('WARNING: ' + case_name + '_status.txt file not found')
+            print('Caught exception ' + str(e))
             return None
 
 
@@ -999,7 +1000,7 @@ def get_num_procs(case_name, **kwargs):
         else:
             return None
     else:
-        print 'status file not found'
+        print('status file not found')
 
 
 def get_case_root(case_name, num_procs=None):

@@ -24,6 +24,7 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+from __future__ import print_function
 
 import math
 import sys
@@ -57,7 +58,7 @@ def get_zone_info(module_name):
         import importlib
         return importlib.import_module(module_name)
     except:
-        print "Unexpected error:", sys.exc_info()[0]
+        print("Unexpected error:", sys.exc_info()[0])
         return None
 
 
@@ -396,17 +397,17 @@ def create_turbine_segments_simple_nonuniform(turbine_zone_dict, u_ref, density,
         total_torque = power / omega
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'WARNING: Torque applied evenly over disc area'
-        print 'wind speed = ' + str(u_ref) + ' m/s'
-        print 'rotor swept area = ' + str(rotor_swept_area) + ' m^2'
-        print 'thrust coefficient = ' + str(tc)
-        print 'tip speed ratio = ' + str(ts)
-        print 'turbine power = ' + str(power) + ' Watts'
-        print 'density = ' + str(density) + ' kg/m^3'
-        print 'number of segments = ' + str(number_of_segments)
-        print 'rotational speed = ' + str(omega) + ' rad/s'
-        print 'total thrust = ' + str(total_thrust) + ' Newtons'
-        print 'total torque = ' + str(total_torque) + ' Joules/rad'
+        print('WARNING: Torque applied evenly over disc area')
+        print('wind speed = ' + str(u_ref) + ' m/s')
+        print('rotor swept area = ' + str(rotor_swept_area) + ' m^2')
+        print('thrust coefficient = ' + str(tc))
+        print('tip speed ratio = ' + str(ts))
+        print('turbine power = ' + str(power) + ' Watts')
+        print('density = ' + str(density) + ' kg/m^3')
+        print('number of segments = ' + str(number_of_segments))
+        print('rotational speed = ' + str(omega) + ' rad/s')
+        print('total thrust = ' + str(total_thrust) + ' Newtons')
+        print('total torque = ' + str(total_torque) + ' Joules/rad')
 
     # Divide into segments
     dtheta = math.radians(360.0 / number_of_segments)
@@ -461,10 +462,10 @@ def create_turbine_segments(thrust_coefficient, blade_inner_location,
     # dq
 
     if thrust_coefficient > 0.999:
-        print 'Induction model expects thrust coefficient < 1.0'
-        print 'For greater range use simple turbine model'
-        print 'Specified thrust coeeficient = ' + str(thrust_coefficient)
-        print 'Resetting thrust coefficient to 0.8'
+        print('Induction model expects thrust coefficient < 1.0')
+        print('For greater range use simple turbine model')
+        print('Specified thrust coeeficient = ' + str(thrust_coefficient))
+        print('Resetting thrust coefficient to 0.8')
         thrust_coefficient = 0.8
 
     area = (math.pi * radius_outer * radius_outer) - math.pi * radius_inner * radius_inner
@@ -524,17 +525,17 @@ def create_turbine_segments(thrust_coefficient, blade_inner_location,
             r = r + dr
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'Betz Limit Induction factor: ', str(induction_factor)
-        print 'wind speed = ' + str(u_inf) + ' m/s'
-        print 'rotor swept area = ' + str(area) + ' m^2'
-        print 'thrust coefficient = ' + str(thrust_coefficient)
-        print 'tip speed ratio = ' + str(tip_speed_ratio)
-        print 'turbine power = ' + str(torque_check * omega) + ' Watts'
-        print 'density = ' + str(density) + ' kg/m^3'
-        print 'number of segments = ' + str(number_of_segments)
-        print 'rotational speed = ' + str(omega) + ' rad/s'
-        print 'total thrust = ' + str(thrust_check) + ' Newtons'
-        print 'total torque = ' + str(torque_check) + ' Joules/rad'
+        print('Betz Limit Induction factor: ', str(induction_factor))
+        print('wind speed = ' + str(u_inf) + ' m/s')
+        print('rotor swept area = ' + str(area) + ' m^2')
+        print('thrust coefficient = ' + str(thrust_coefficient))
+        print('tip speed ratio = ' + str(tip_speed_ratio))
+        print('turbine power = ' + str(torque_check * omega) + ' Watts')
+        print('density = ' + str(density) + ' kg/m^3')
+        print('number of segments = ' + str(number_of_segments))
+        print('rotational speed = ' + str(omega) + ' rad/s')
+        print('total thrust = ' + str(thrust_check) + ' Newtons')
+        print('total torque = ' + str(torque_check) + ' Joules/rad')
         turbine_name_dict[turbine_name] = torque_check * omega
 
     return annulus
@@ -949,7 +950,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
     thrust_check = thrust_check_total
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'Convolved total thrust: ', thrust_check
+        print('Convolved total thrust: ', thrust_check)
 
     #thrust_check = 0.0
     total_thrust = 0.0
@@ -960,12 +961,12 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
         total_thrust += segment[0]
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'Specified total thrust: ', total_thrust
+        print('Specified total thrust: ', total_thrust)
 
     if thrust_check > 0.0:
         thrust_factor = total_thrust / thrust_check
         if MPI.COMM_WORLD.Get_rank() == 0:
-            print 'Scaling thrust: ', thrust_factor
+            print('Scaling thrust: ', thrust_factor)
         cell_force_scaled = []
         for cell in cell_force:
             force = cell
@@ -985,4 +986,4 @@ def test_convolution():
     b = convolution(a, (0, 0, 0), (1, 0, 0), [(0.0, 0.0, 0.99)], [1.0])
     b = convolution(a, (0, 0, 0), (1, 0, 0), [(2.0, 0.0, 0.5)], [1.0])
 
-    print b
+    print(b)

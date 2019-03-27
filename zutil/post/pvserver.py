@@ -1,3 +1,4 @@
+from __future__ import print_function
 
 from paraview.simple import *
 
@@ -130,7 +131,7 @@ def get_remote_port(**kwargs):
         paraview_remote_port = kwargs['paraview_remote_port']
     else:
         # Attempt to find an unused remote port
-        print 'Attempting to find unused port in range 12000 to 13000'
+        print('Attempting to find unused port in range 12000 to 13000')
         for p in range(12000, 13000):
             tp = Value('i', p)
 
@@ -143,7 +144,7 @@ def get_remote_port(**kwargs):
             if tp.value != 0:
                 break
 
-        print 'Selected Port: ' + str(p)
+        print('Selected Port: ' + str(p))
         analysis.data.paraview_remote_port = p
 
 
@@ -181,15 +182,15 @@ def pvserver_connect(**kwargs):
     if '-sp' in _paraview_cmd or '--client-host' in _paraview_cmd:
         print('pvserver_process: Please only provide pvserver'
               'executable path and name without arguments')
-        print 'e.g. mpiexec -n 1 /path_to_pvserver/bin/pvserver'
+        print('e.g. mpiexec -n 1 /path_to_pvserver/bin/pvserver')
         return False
 
     # Add Check for passwordless ssh
-    print 'Testing passwordless ssh access'
+    print('Testing passwordless ssh access')
     if not test_ssh_mp(**kwargs):
-        print 'ERROR: Passwordless ssh access to data host failed'
+        print('ERROR: Passwordless ssh access to data host failed')
         return False
-    print '-> Passed'
+    print('-> Passed')
 
     # Add check for paraview version
 
@@ -203,7 +204,7 @@ def pvserver_connect(**kwargs):
     if not use_multiprocess:
         pvserver_process(**kwargs)
     else:
-        print 'Starting pvserver connect'
+        print('Starting pvserver connect')
         process_id = mp.Process(target=pvserver_process, kwargs=kwargs)
         process_id.start()
         # process_id.join()
@@ -224,7 +225,7 @@ def pvserver_process(**kwargs):
     #global remote_data, data_dir, data_host, remote_server_auto
     #global paraview_cmd, paraview_home, paraview_port, paraview_remote_port
 
-    print 'Starting pvserver process'
+    print('Starting pvserver process')
 
     _remote_dir = analysis.data.data_dir
     if 'data_dir' in kwargs:
@@ -255,7 +256,7 @@ def pvserver_process(**kwargs):
         paraview_remote_port = kwargs['paraview_remote_port']
     else:
         # Attempt to find an unused remote port
-        print 'Attempting to find unused port in range 12000 to 13000'
+        print('Attempting to find unused port in range 12000 to 13000')
         for p in range(12000, 13000):
             try:
                 env.use_ssh_config = True
@@ -263,7 +264,7 @@ def pvserver_process(**kwargs):
                 break
             except:
                 pass
-        print 'Selected Port: ' + str(p)
+        print('Selected Port: ' + str(p))
         analysis.data.paraview_remote_port = p
 
     if 'job_queue' in kwargs:
@@ -280,7 +281,7 @@ def pvserver_process(**kwargs):
             paraview_args = (' -rc --client-host=' + remote_hostname +
                              ' -sp=' + str(paraview_remote_port))
 
-        print paraview_args
+        print(paraview_args)
 
         job_dict = {
             'job_queue': kwargs['job_queue'],
@@ -298,7 +299,7 @@ def pvserver_process(**kwargs):
         if '-sp' in _paraview_cmd or '--client-host' in _paraview_cmd:
             print ('pvserver_process: Please only provide pvserver'
                    'executable path and name without arguments')
-            print 'e.g. mpiexec -n 1 /path_to_pvserver/bin/pvserver'
+            print('e.g. mpiexec -n 1 /path_to_pvserver/bin/pvserver')
             return False
         if 'vizstack' in kwargs:
             _paraview_cmd = (_paraview_cmd + ' -c localhost ' + ' -p ' +

@@ -24,12 +24,14 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+from __future__ import print_function
+from __future__ import absolute_import
 import math
 import ast
 import sys
 from paraview.simple import *
 import numpy as np
-import post
+from . import post
 import zutil
 import os
 from zutil import ABL
@@ -485,11 +487,11 @@ def report_data_reader(name, arr1, arr2):
     var = -999.0
     idx = np.where(arr1 == name)
     if (len(idx[0].flat) == 0):
-        print 'farm.py : report_data_reader : no data found in results file for ' + name
+        print('farm.py : report_data_reader : no data found in results file for ' + name)
     elif (len(idx[0].flat) == 1):
         var = float(arr2[idx[0]][0])
     else:
-        print 'farm.py : report_data_reader : multiple columns in data results file for ' + name + ' ' + len(idx[0].flat)
+        print('farm.py : report_data_reader : multiple columns in data results file for ' + name + ' ' + len(idx[0].flat))
     return var
 
 
@@ -523,18 +525,18 @@ def write_windfarmer_data(case_name, num_processes, up):
     # Step 2: Determine the (conventional) wind direction from the case inflow
     # parameters
     v = case_data['IC_1']['V']['vector']
-    print 'farm.py : write_windfarmer_data : v = ' + str(v)
+    print('farm.py : write_windfarmer_data : v = ' + str(v))
     import numpy as np
     angle = 270.0 - np.angle(complex(v[0], v[1]), deg=True)
     if (angle < 0.0):
         angle += 360.0
     if (angle > 360.0):
         angle -= 360.0
-    print 'farm.py : write_windfarmer_data : angle = ' + str(angle)
+    print('farm.py : write_windfarmer_data : angle = ' + str(angle))
 
     # Step 3: Import the result file data incuding the probe data
     windfarmer_filename = case_name + "_" + str(angle) + '.out'
-    print 'farm.py : write_windfarmer_data : windfarmer_filename = ' + windfarmer_filename
+    print('farm.py : write_windfarmer_data : windfarmer_filename = ' + windfarmer_filename)
     report_file_name = case_name + '_report.csv'
     report_array = np.genfromtxt(report_file_name, dtype=None)
 
@@ -601,7 +603,7 @@ def write_windfarmer_data(case_name, num_processes, up):
             f.write(name + "," + str(x) + "," + str(y) + "," + str(zground) + "," + str(zhub) + "," +
                     str(zhub - zground) + "," + "," + str(angle) + "," + str(TI_hub) + ",,,,,," + str(VXY_hub) + ",,,,," +
                     str(Theta_hub) + ",,," + str(Local_Elevation_Angle) + ",,,,, \n")
-        print 'farm.py : write_windfarmer_data : DONE'
+        print('farm.py : write_windfarmer_data : DONE')
 
 
 def create_trbx_zcfd_input(case_name='windfarm',
@@ -625,19 +627,19 @@ def create_trbx_zcfd_input(case_name='windfarm',
 
     # Make sure that the turbine zone contains the reference point
     if (turbine_zone_length_factor < 2.5 * reference_point_offset):
-        print 'WARNING: Increasing Turbine Zone Length Factor from ' \
-            + str(turbine_zone_length_factor) + ' to ' + str(2.5 * reference_point_offset)
+        print('WARNING: Increasing Turbine Zone Length Factor from ' \
+            + str(turbine_zone_length_factor) + ' to ' + str(2.5 * reference_point_offset))
         turbine_zone_length_factor = 2.5 * reference_point_offset
     # Issue a warning if the turbine zone length factor is less than 1.0
     if (turbine_zone_length_factor < 1.0):
-        print 'WARNING: Turbine Zone Length Factor less than 1.0: ' + str(turbine_zone_length_factor)
+        print('WARNING: Turbine Zone Length Factor less than 1.0: ' + str(turbine_zone_length_factor))
     global min_dist, closest_point
     from xml.etree import ElementTree as ET
     local_surface = None
     if terrain_file is not None:
         reader = OpenDataFile(terrain_file)
         local_surface = servermanager.Fetch(reader)
-        print 'terrain file = ' + terrain_file
+        print('terrain file = ' + terrain_file)
         pointLocator = vtk.vtkPointLocator()
         pointLocator.SetDataSet(local_surface)
         pointLocator.BuildLocator()
@@ -650,7 +652,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
         with open(case_name + '_probes.py', 'w') as tp:
             tp.write('turb_probe = { \n')
             for [location_file_name, trbx_file_name] in turbine_files:
-                print 'trbx file name = ' + trbx_file_name
+                print('trbx file name = ' + trbx_file_name)
                 trbx = ET.ElementTree(file=trbx_file_name)
                 # ET.dump(trbx)
                 root = trbx.getroot()
@@ -672,7 +674,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         turbine_dict['DataTable'][wp][child.tag] = child.text
                     wp += 1
                 # print turbine_dict
-                print 'location file name = ' + location_file_name
+                print('location file name = ' + location_file_name)
                 location_array = np.genfromtxt(location_file_name, dtype=None)
                 # catch the case where only one turbine location is specified
                 if (location_array.ndim < 1):
@@ -720,7 +722,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     tz.write('\'def\':\'' + directory + name +
                              '-' + str(wind_direction) + '.vtp\',\n')
                     if (len(turbine_dict['DataTable'].keys()) == 0):
-                        print 'WARNING: Windspeed DataTable empty - using Reference Wind Speed = ' + str(reference_wind_speed)
+                        print('WARNING: Windspeed DataTable empty - using Reference Wind Speed = ' + str(reference_wind_speed))
                     wsc = np.zeros((4, len(turbine_dict['DataTable'].keys())))
                     tcc_string = '['  # Thrust coefficient curve
                     tsc_string = '['  # Tip speed ratio curve
@@ -817,10 +819,10 @@ def extract_probe_data(case_name='windfarm',
             probe.Update()
             V = VN.vtk_to_numpy(probe.GetOutput().GetPointData().GetArray('V'))
             ti = VN.vtk_to_numpy(probe.GetOutput().GetPointData().GetArray('ti'))
-            print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_x ' + str(V[0][0])
-            print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_y ' + str(V[0][1])
-            print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_z ' + str(V[0][2])
-            print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_ti ' + str(ti[0] + 0.1)
+            print(str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_x ' + str(V[0][0]))
+            print(str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_y ' + str(V[0][1]))
+            print(str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_z ' + str(V[0][2]))
+            print(str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_ti ' + str(ti[0] + 0.1))
 
 
 def generate_mesh_pts():
@@ -850,15 +852,15 @@ def create_profile(profile_name, hub_height, hub_height_vel, direction, roughnes
     # Using RH Law compute utau using hub values
     utau = ABL.friction_velocity(hub_height_vel, hub_height, roughness, kappa)
 
-    print 'Friction Velocity: ' + str(utau)
+    print('Friction Velocity: ' + str(utau))
 
     # Ref http://orbit.dtu.dk/files/3737714/ris-r-1688.pdf
     coriolis_parameter = ABL.coriolis_parameter(latitude)
     geostrophic_plane = ABL.ekman_layer_height(utau, coriolis_parameter)
 
-    print 'Ekman Layer top: ' + str(geostrophic_plane)
-    print 'This is top of ABL for neutral conditions'
-    print 'Wall Stress: ' + str(rho * utau**2)
+    print('Ekman Layer top: ' + str(geostrophic_plane))
+    print('This is top of ABL for neutral conditions')
+    print('Wall Stress: ' + str(rho * utau**2))
 
     pts = generate_mesh_pts()
 
@@ -910,7 +912,7 @@ def create_profile(profile_name, hub_height, hub_height_vel, direction, roughnes
     linesPolyData.GetPointData().AddArray(mut_vec)
 
     # Write
-    print 'Writing: ' + profile_name + '.vtp'
+    print('Writing: ' + profile_name + '.vtp')
     writer = vtk.vtkXMLPolyDataWriter()
     writer.SetFileName(profile_name + '.vtp')
     writer.SetInputData(linesPolyData)
@@ -1042,6 +1044,6 @@ parameters['IC_1']['profile']['field'] = '$profile_name.vtp'
                                                    wind_speed=wind_speed,
                                                    profile_name=profile_name
                                                    )
-    print 'Writing: ' + case_name + '.py'
+    print('Writing: ' + case_name + '.py')
     with open(case_name + '.py', 'w') as f:
         f.write(case_file_str)

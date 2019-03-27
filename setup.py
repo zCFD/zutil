@@ -1,7 +1,7 @@
 from distutils.core import setup
 
 setup(name="zutil",
-      version='0.1.5',
+      version='0.1.6',
       description="Utilities used for generating zCFD control dictionaries",
       author="Zenotech",
       author_email="support@zenotech.com",
