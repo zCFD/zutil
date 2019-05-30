@@ -629,8 +629,8 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                     cd = np.interp(math.degrees(alpha),aerofoil_cd.T[0],aerofoil_cd.T[1])
                     f_L = cl*0.5*density*urel**2*chord
                     f_D = cd*0.5*density*urel**2*chord
-                    F_L = old_div(nblades,(2.0*math.pi*rp)*f_L)
-                    F_D = old_div(nblades,(2.0*math.pi*rp)*f_D)
+                    F_L = old_div(nblades,(2.0*math.pi*rp))*f_L
+                    F_D = old_div(nblades,(2.0*math.pi*rp))*f_D
                     dt = (F_L*math.cos(theta_rel) + F_D*math.sin(theta_rel))*da
                     dq = (F_L*math.sin(theta_rel) - F_D*math.cos(theta_rel))*da
                     annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
@@ -638,7 +638,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                     total_thrust += dt
                     total_torque += dq*rp
                     r = r + dr
-            if MPI.COMM_WORLD.Get_rank() == 0 and verbose:
+            if ((MPI.COMM_WORLD.Get_rank() == 0) and verbose):
                 print(beta_pitch, total_torque, total_area, total_thrust)
             return total_torque, total_area, total_thrust, annulus
 
@@ -708,8 +708,8 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
             print('turbine power = ' + str(total_power) + ' Watts')
             print('total thrust = ' + str(total_thrust) + ' Newtons')
             print('total torque = ' + str(total_torque) + ' Joules/rad')
-            print('% of Betz limit power ' + str(old_div(total_power,betz_power*100.0)) + '%')
-            print('% of Glauert optimal power ' + str(old_div(total_power,glauert_power*100.0)) + '%')
+            print('% of Betz limit power ' + str(old_div(100.0*total_power,betz_power)) + '%')
+            print('% of Glauert optimal power ' + str(old_div(100.0*total_power,glauert_power)) + '%')
     return annulus
 
 def project_to_plane(pt, plane_point, plane_normal):
@@ -1009,8 +1009,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 # Set thrust force
                 for i in range(3):
-                    cell_dt[i] += old_div(dt_per_area * area, \
-                        redistribution_weight * disc_normal[i] * eta)
+                    cell_dt[i] += old_div(dt_per_area * area, redistribution_weight) * disc_normal[i] * eta
 
                 # Set torque force
                 # Vector for centre to pt
@@ -1021,8 +1020,8 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 # Note converting torque to a force
                 for i in range(3):
-                    cell_dq[i] += old_div(dq_per_area * area, redistribution_weight * \
-                        torque_vector[i] * eta / disc_vec_mag)
+                    cell_dq[i] += old_div(dq_per_area * area, redistribution_weight) * \
+                        old_div(torque_vector[i] * eta / disc_vec_mag)
         else:
             # Need for find nearest segment
 
@@ -1088,7 +1087,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
                 # Set thrust force
                 for i in range(3):
                     cell_dt[i] += old_div(dt_per_area * area, \
-                        redistribution_weight * disc_normal[i] * eta)
+                        redistribution_weight) * disc_normal[i] * eta
 
                 # Set torque force
                 # Vector for centre to pt
@@ -1099,8 +1098,8 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 # Note converting torque to force
                 for i in range(3):
-                    cell_dq[i] += old_div(dq_per_area * area, redistribution_weight * \
-                        torque_vector[i] * eta / disc_vec_mag)
+                    cell_dq[i] += old_div(dq_per_area * area, redistribution_weight) * \
+                        old_div(torque_vector[i] * eta / disc_vec_mag)
 
         cell_force.append((cell_dt[0] + cell_dq[0],
                            cell_dt[1] + cell_dq[1],
