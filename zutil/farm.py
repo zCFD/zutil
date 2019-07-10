@@ -842,6 +842,7 @@ def generate_mesh_pts():
 
 
 def create_profile(profile_name, hub_height, hub_height_vel, direction, roughness,
+                   min_ti, min_mut,
                    scale_k=False, plot=False,
                    kappa=0.41, rho=1.225, cmu=0.03, mu=1.789e-5,
                    latitude=55.0):
@@ -871,8 +872,8 @@ def create_profile(profile_name, hub_height, hub_height_vel, direction, roughnes
     k = k_scale * (utau**2) / math.sqrt(cmu)
     eps = np.ones(len(pts)) * (utau**3) / (kappa * (pts + roughness))
     # Note this mut/mu
-    mut = rho * cmu * k**2 / (eps * mu)
-    TI = (2 * k / 3)**0.5 / vel
+    mut = np.maximum(rho * cmu * k**2 / (eps * mu), np.ones(len(pts))*min_mut)
+    TI = np.maximum((2 * k / 3)**0.5 / vel, np.ones(len(pts))*min_ti)
     lengthscale = cmu**0.75 * k**1.5 / eps
 
     du_dz = np.gradient(vel, pts, edge_order=2)
@@ -979,7 +980,7 @@ def get_profile_name(base_case, wind_direction, wind_speed):
 
 
 def generate_inputs(base_case, wind_direction, wind_speed, wind_height, roughness_length,
-                    turbine_info, terrain_file):
+                    turbine_info, terrain_file, min_ti, min_mut, scale_k=True):
 
     # Generate new name for this case
     case_name = get_case_name(base_case, wind_direction, wind_speed)
@@ -1000,7 +1001,7 @@ def generate_inputs(base_case, wind_direction, wind_speed, wind_height, roughnes
 
     # Generate profile
     create_profile(profile_name, wind_height, wind_speed, wind_direction,
-                   roughness_length)
+                   roughness_length, min_ti, min_mut, scale_k)
 
     from string import Template
 
