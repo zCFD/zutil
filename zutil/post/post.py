@@ -1,6 +1,14 @@
 """ Helper functions for accessing Paraview functionality
 .. moduleauthor:: Zenotech Ltd
 """
+from __future__ import print_function
+from __future__ import division
+from future import standard_library
+standard_library.install_aliases()
+from builtins import str
+from builtins import range
+from past.utils import old_div
+from builtins import object
 from paraview.simple import *
 # from paraview.vtk.util import numpy_support
 try:
@@ -70,7 +78,7 @@ def sum_and_zone_filter(input, array_name, ignore_zone, filter=None):
     return sum
 
 
-class GeomFilterLT:
+class GeomFilterLT(object):
 
     def __init__(self, val, idx):
         #
@@ -85,7 +93,7 @@ class GeomFilterLT:
             return False
 
 
-class GeomFilterGT:
+class GeomFilterGT(object):
 
     def __init__(self, val, idx):
         #
@@ -229,8 +237,8 @@ def calc_lift_centre_of_action(force, moment, ref_point):
     # spanwise centre ys0 at zs0
     # residual Mz moment (Mx=My=0) mzs0
 
-    xs0 = ref_point[0] - moment[1] / force[2]
-    ys0 = ref_point[1] + moment[0] / force[2]
+    xs0 = ref_point[0] - old_div(moment[1], force[2])
+    ys0 = ref_point[1] + old_div(moment[0], force[2])
 
     zs0 = ref_point[2]
     mzs0 = moment[2] - force[1] * \
@@ -244,8 +252,8 @@ def calc_drag_centre_of_action(force, moment, ref_point):
     # spanwise centre ys0 at zs0
     # residual Mz moment (Mx=My=0) mzs0
 
-    zs0 = ref_point[2] + moment[1] / force[0]
-    ys0 = ref_point[1] - moment[2] / force[0]
+    zs0 = ref_point[2] + old_div(moment[1], force[0])
+    ys0 = ref_point[1] - old_div(moment[2], force[0])
 
     xs0 = ref_point[0]
     # moment[2] - force[1]*(xs0-ref_point[0]) + force[0]*(ys0-ref_point[1])
@@ -389,13 +397,13 @@ def get_monitor_data(file, monitor_name, var_name):
     monitor_client = servermanager.Fetch(monitor)
     table = Table(monitor_client)
     data = table.RowData
-    names = data.keys()
+    names = list(data.keys())
     num_var = len(names) - 2
     if (str(monitor_name) + "_" + str(var_name) in names):
         index = names.index(str(monitor_name) + "_" + str(var_name))
         return (data[names[0]], data[names[index]])
     else:
-        print 'POST.PY: MONITOR POINT: ' + str(monitor_name) + "_" + str(var_name) + ' NOT FOUND'
+        print('POST.PY: MONITOR POINT: ' + str(monitor_name) + "_" + str(var_name) + ' NOT FOUND')
 
 
 def residual_plot(file, pl):
@@ -415,10 +423,10 @@ def residual_plot(file, pl):
 
     data = table.RowData
 
-    names = data.keys()
+    names = list(data.keys())
 
     num_var = len(names) - 2
-    num_rows = ((num_var - 1) / 4) + 1
+    num_rows = (old_div((num_var - 1), 4)) + 1
 
     fig = pl.figure(figsize=(40, 10 * num_rows), dpi=100,
                     facecolor='w', edgecolor='k')
@@ -884,8 +892,8 @@ def cat_case_file(remote_dir, case_name):
     with cd(remote_dir):
         with hide('output', 'running', 'warnings'), settings(warn_only=True):
             # cmd = 'cat '+case_name+'.py'
-            import StringIO
-            contents = StringIO.StringIO()
+            import io
+            contents = io.StringIO()
             get(case_name + '.py', contents)
             # operate on 'contents' like a file object here, e.g. 'print
             return contents.getvalue()
@@ -895,8 +903,8 @@ def cat_status_file(remote_dir, case_name):
 
     with cd(remote_dir), hide('output', 'running', 'warnings'), settings(warn_only=True):
         # cmd = 'cat '+case_name+'_status.txt'
-        import StringIO
-        contents = StringIO.StringIO()
+        import io
+        contents = io.StringIO()
         result = get(case_name + '_status.txt', contents)
         if result.succeeded:
             # operate on 'contents' like a file object here, e.g. 'print
@@ -933,16 +941,16 @@ def get_case_parameters_str(case_name, **kwargs):
                     # print status_file_str
                     return case_file_str
                 else:
-                    print 'WARNING: ' + case_name + '.py file not found'
+                    print('WARNING: ' + case_name + '.py file not found')
                     return None
         except:
-            print 'WARNING: ' + case_name + '.py file not found'
+            print('WARNING: ' + case_name + '.py file not found')
             return None
 
 
 def get_case_parameters(case_name, **kwargs):
     case_file_str = get_case_parameters_str(case_name, **kwargs)
-    exec case_file_str
+    exec(case_file_str)
     return parameters
 
 
@@ -970,7 +978,7 @@ def get_status_dict(case_name, **kwargs):
             # print status_file_str
             return json.loads(status_file_str)
         else:
-            print 'WARNING: ' + case_name + '_status.txt file not found'
+            print('WARNING: ' + case_name + '_status.txt file not found')
             return None
     else:
         try:
@@ -982,11 +990,11 @@ def get_status_dict(case_name, **kwargs):
                     # print status_file_str
                     return json.loads(status_file_str)
                 else:
-                    print 'WARNING: ' + case_name + '_status.txt file not found'
+                    print('WARNING: ' + case_name + '_status.txt file not found')
                     return None
-        except Exception, e:
-            print 'WARNING: ' + case_name + '_status.txt file not found'
-            print 'Caught exception '+str(e)
+        except Exception as e:
+            print('WARNING: ' + case_name + '_status.txt file not found')
+            print('Caught exception ' + str(e))
             return None
 
 
@@ -999,7 +1007,7 @@ def get_num_procs(case_name, **kwargs):
         else:
             return None
     else:
-        print 'status file not found'
+        print('status file not found')
 
 
 def get_case_root(case_name, num_procs=None):
@@ -1057,6 +1065,7 @@ def print_html_parameters(parameters):
                                    'speed': speed,
                                    'mach': mach,
                                    })
+
 
 import uuid
 import time

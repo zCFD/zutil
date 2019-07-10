@@ -24,10 +24,18 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import division
 
+from past.builtins import execfile
+from builtins import zip
+from builtins import str
+from builtins import range
+from past.utils import old_div
 import math
 import sys
-import os
+from os import path
 import numpy as np
 
 
@@ -44,7 +52,7 @@ def include(filename):
     include a file by executing it. This imports everything including
     variables into the calling module
     """
-    if os.path.exists(filename):
+    if path.exists(filename):
         execfile(filename)
 
 
@@ -57,14 +65,14 @@ def get_zone_info(module_name):
         import importlib
         return importlib.import_module(module_name)
     except:
-        print "Unexpected error:", sys.exc_info()[0]
+        print("Unexpected error:", sys.exc_info()[0])
         return None
 
 
 def get_default_zone_info():
     import inspect
     _, filename, linenumber, _, _, _ = inspect.stack()[1]
-    return get_zone_info(os.path.split(os.path.splitext(filename)[0])[1] +
+    return get_zone_info(path.split(path.splitext(filename)[0])[1] +
                          '_zone')
 
 
@@ -126,8 +134,8 @@ def angle_from_vector(vec):
     """
     mag = math.sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2])
 
-    beta = math.asin(vec[1] / mag)
-    alpha = math.acos(vec[0] / (mag * math.cos(beta)))
+    beta = math.asin(old_div(vec[1], mag))
+    alpha = math.acos(old_div(vec[0], (mag * math.cos(beta))))
     alpha = math.degrees(alpha)
     beta = math.degrees(beta)
     return (alpha, beta)
@@ -208,14 +216,14 @@ def R_2vect(R, vector_orig, vector_fin):
     from random import gauss, uniform
 
     # Convert the vectors to unit vectors.
-    vector_orig = vector_orig / norm(vector_orig)
-    vector_fin = vector_fin / norm(vector_fin)
+    vector_orig = old_div(vector_orig, norm(vector_orig))
+    vector_fin = old_div(vector_fin, norm(vector_fin))
 
     # The rotation axis (normalised).
     axis = cross(vector_orig, vector_fin)
     axis_len = norm(axis)
     if axis_len != 0.0:
-        axis = axis / axis_len
+        axis = old_div(axis, axis_len)
 
     # Alias the axis coordinates.
     x = axis[0]
@@ -241,31 +249,31 @@ def R_2vect(R, vector_orig, vector_fin):
     R[2, 2] = 1.0 + (1.0 - ca) * (z**2 - 1.0)
 
 
-def vector_vector_rotate(vec,axis,origin,theta):
+def vector_vector_rotate(vec, axis, origin, theta):
     # Rotate vector
-    temp = [0.0,0.0,0.0]
+    temp = [0.0, 0.0, 0.0]
 
-    temp[0] = ( (origin[0] * (axis[1] * axis[1] + axis[2] * axis[2]) -
-         axis[0] * (origin[1] * axis[1] + origin[2] * axis[2] - dot(axis, vec))) *
-            (1.0 - math.cos(theta)) +
-        vec[0] * math.cos(theta) +
-        (-origin[2] * axis[1] + origin[1] * axis[2] - axis[2] * vec[1] +
-         axis[1] * vec[2]) *
-            math.sin(theta))
-    temp[1] = ( (origin[1] * (axis[0] * axis[0] + axis[2] * axis[2]) -
-         axis[1] * (origin[0] * axis[0] + origin[2] * axis[2] - dot(axis, vec))) *
-            (1.0 - math.cos(theta)) +
-        vec[1] * math.cos(theta) +
-        (origin[2] * axis[0] - origin[0] * axis[2] + axis[2] * vec[0] -
-         axis[0] * vec[2]) *
-            math.sin(theta) )
-    temp[2] = ( (origin[2] * (axis[0] * axis[0] + axis[1] * axis[1]) -
-         axis[2] * (origin[0] * axis[0] + origin[1] * axis[1] - dot(axis, vec))) *
-            (1.0 - math.cos(theta)) +
-        vec[2] * math.cos(theta) +
-        (-origin[1] * axis[0] + origin[0] * axis[1] - axis[1] * vec[0] +
-         axis[0] * vec[1]) *
-            math.sin(theta) )
+    temp[0] = ((origin[0] * (axis[1] * axis[1] + axis[2] * axis[2]) -
+                axis[0] * (origin[1] * axis[1] + origin[2] * axis[2] - dot(axis, vec))) *
+               (1.0 - math.cos(theta)) +
+               vec[0] * math.cos(theta) +
+               (-origin[2] * axis[1] + origin[1] * axis[2] - axis[2] * vec[1] +
+                axis[1] * vec[2]) *
+               math.sin(theta))
+    temp[1] = ((origin[1] * (axis[0] * axis[0] + axis[2] * axis[2]) -
+                axis[1] * (origin[0] * axis[0] + origin[2] * axis[2] - dot(axis, vec))) *
+               (1.0 - math.cos(theta)) +
+               vec[1] * math.cos(theta) +
+               (origin[2] * axis[0] - origin[0] * axis[2] + axis[2] * vec[0] -
+                axis[0] * vec[2]) *
+               math.sin(theta))
+    temp[2] = ((origin[2] * (axis[0] * axis[0] + axis[1] * axis[1]) -
+                axis[2] * (origin[0] * axis[0] + origin[1] * axis[1] - dot(axis, vec))) *
+               (1.0 - math.cos(theta)) +
+               vec[2] * math.cos(theta) +
+               (-origin[1] * axis[0] + origin[0] * axis[1] - axis[1] * vec[0] +
+                axis[0] * vec[1]) *
+               math.sin(theta))
 
     return temp
 
@@ -293,258 +301,421 @@ def turbine_speed_interpolate(u_inf, tip_speed_curve):
     ts = np.interp(u_inf, wsc[0], wsc[1])
     return ts
 
+# area of polygon specified as counter-clockwise vertices (x,y) where last = first
+def polygon_area(x,y):
+    a = 0.0
+    for i in range(len(x)-1):
+        a += 0.5*(x[i+1]+x[i])*(y[i+1]-y[i])
+    return a
 
-def create_turbine_segments_simple(turbine_zone_dict, u_ref, density, turbine_name_dict={}, turbine_name="", number_of_segments=12):
-    # turbine_zone_dict is a Python dictionary containing the fluid zone defintion for the turbine
-    # u_ref is the reference wind speed in metres / second
+def trapezoid(x,y):
+    a = 0
+    for i in range(len(x)-1):
+        a += 0.5*(y[i+1]+y[i])*(x[i+1]-x[i])
+    return a
+
+# Optimal power coefficient as a function of (a function of) tip speed ratio
+# "A Compact, Closed-form Solution for the Optimum, Ideal Wind Turbine" (Peters, 2012)
+def glauert_peters(y):
+    p1 = 16.0*(1.0-2.0*y)/(27.0*(1.0+y/4.0))
+    p2 = old_div((math.log(2.0*y)+(1.0-2.0*y)+0.5*(1.0-2.0*y)**2),((1.0-2.0*y)**3))
+    p3 = 1.0 + (457.0/1280.0)*y + (51.0/640.0)*y**2 + y**3/160.0 + 3.0/2.0*y*p2
+    power_coeff = p1*p3
+    return power_coeff
+
+# Golden section search: Given f with a single local max in [a,b], gss returns interval [c,d] with d-c <= tol.
+def gss(f,a,b,tol=1e-5):
+    invphi = old_div((math.sqrt(5) - 1), 2) # 1/phi
+    invphi2 = old_div((3 - math.sqrt(5)), 2) # 1/phi^2
+    (a,b)=(min(a,b),max(a,b))
+    h = b - a
+    if h <= tol: return (a,b)
+    n = int(math.ceil(old_div(math.log(old_div(tol,h)),math.log(invphi))))
+    c = a + invphi2 * h
+    d = a + invphi * h
+    yc = f(c)[0]
+    yd = f(d)[0]
+    for k in range(n-1):
+        if yc > yd:
+            b = d
+            d = c
+            yd = yc
+            h = invphi*h
+            c = a + invphi2 * h
+            yc = f(c)[0]
+        else:
+            a = c
+            c = d
+            yc = yd
+            h = invphi*h
+            d = a + invphi * h
+            yd = f(d)[0]
+    if yc > yd:
+        return (a,d)
+    else:
+        return (c,b)
+
+def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name_dict={}, turbine_name=""):
+    # turbine_zone_dict is a Python dictionary containing the fluid zone definition for the turbine
+    # vel is the reference wind velocity in metres / second
     # density is is kg / cubic metre
-
     from mpi4py import MPI
-    ri = turbine_zone_dict['inner radius']
-    ro = turbine_zone_dict['outer radius']
+
+    if 'verbose' in turbine_zone_dict:
+        verbose = turbine_zone_dict['verbose']
+    else:
+        verbose = False
+
+    if 'number of segments' in turbine_zone_dict:
+        number_of_segments = turbine_zone_dict['number of segments']
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0 and verbose:
+            print('NO NUMBER OF SEGMENTS SPECIFIED - SETTING TO DEFAULT 12')
+        number_of_segments = 12
+
+    if 'inner radius' in turbine_zone_dict:
+        ri = turbine_zone_dict['inner radius']
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print('NO INNER RADIUS SPECIFIED')
+
+    if 'outer radius' in turbine_zone_dict:
+        ro = turbine_zone_dict['outer radius']
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print('NO OUTER RADIUS SPECIFIED')
+
     rotor_swept_area = (math.pi * ro * ro) - (math.pi * ri * ri)
+    u_ref = math.sqrt(v0*v0 + v1*v1 + v2*v2)
 
-    tc = np.interp(u_ref,
-                   np.array(turbine_zone_dict['thrust coefficient curve']).T[0],
-                   np.array(turbine_zone_dict['thrust coefficient curve']).T[1])
+    induction = False
+    simple = False
+    bet = False
+    if 'model' in turbine_zone_dict:
+        if 'induction' in turbine_zone_dict['model']:
+            if MPI.COMM_WORLD.Get_rank() == 0 and verbose:
+                print('INDUCTION MODEL')
+            induction = True
+        if 'simple' in turbine_zone_dict['model']:
+            if MPI.COMM_WORLD.Get_rank() == 0 and verbose:
+                print('SIMPLE MODEL')
+            simple = True
+        if 'blade element theory' in turbine_zone_dict['model']:
+            if MPI.COMM_WORLD.Get_rank() == 0 and verbose:
+                print('BLADE ELEMENT THEORY MODEL')
+            bet = True
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print('No MODEL SPECIFIED - DEFAULT TO SIMPLE MODEL')
+        simple = True
 
-    ts = np.interp(u_ref,
-                   np.array(turbine_zone_dict['tip speed ratio curve']).T[0],
-                   np.array(turbine_zone_dict['tip speed ratio curve']).T[1])
-    # Calculate rotation speed from tip speed ratio
-    omega = ts * u_ref / ro
+    if 'betz' in turbine_zone_dict:
+        betz = turbine_zone_dict['betz']
+    else:
+        betz = False
 
-    power = np.interp(u_ref,
-                      np.array(turbine_zone_dict['turbine power curve']).T[0],
-                      np.array(turbine_zone_dict['turbine power curve']).T[1])
+    if 'glauert' in turbine_zone_dict:
+        glauert = turbine_zone_dict['glauert']
+        if glauert:
+            if betz:
+                if MPI.COMM_WORLD.Get_rank() == 0:
+                    print('OVER-RIDING BETZ WITH GLAUERT POWER MODEL')
+                betz = False
+    else:
+        glauert = False
 
-    total_thrust = 0.5 * density * rotor_swept_area * u_ref * u_ref * tc
-    total_torque = 0.0
-    if omega > 0.0:
-        total_torque = power / omega
+    if 'inertia' in turbine_zone_dict:
+        inertia = turbine_zone_dict['inertia']
+    else:
+        inertia = False
 
-    # Divide into segments
-    dtheta = math.radians(360.0 / number_of_segments)
-    annulus = []
-    theta = 0.0
-    area_check = 0.0
-    thrust_check = 0.0
-    torque_check = 0.0
-    for i in range(number_of_segments):
-        dr = 0.0
-        r = ri
-        while r < ro:
-            dr = dtheta * r / (1.0 - 0.5 * dtheta)
-            max_r = r + dr
-            if max_r > ro:
-                dr = ro - r
-            rp = r + 0.5 * dr
-            dt = total_thrust * (dtheta * rp * dr / rotor_swept_area)
-            dq = total_torque * (dtheta * rp * dr / rotor_swept_area) / rp
-            annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
-            area_check = area_check + dtheta * rp * dr
-            thrust_check = thrust_check + dt
-            torque_check = torque_check + dq * rp
-            # print str(i) + ' ' + str(rp) + ' ' + str(dt) + ' ' + str(dq)
-            r = r + dr
-    # print annulus
+    if inertia:
+        if 'omega_old' in turbine_zone_dict:
+            omega_old = turbine_zone_dict['omega old']
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('INERTIA NEEDS OMEGA HISTORY')
+        if 'timestep' in turbine_zone_dict:
+            timestep = turbine_zone_dict['timestep']
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('INERTIA NEEDS TIME STEP')
+        if 'rotor moment of inertia' in turbine_zone_dict:
+            rotor_moment = turbine_zone_dict['rotor moment of inertia']
+        elif 'mean blade material density' in turbine_zone_dict:
+            blade_material_density = turbine_zone_dict['mean blade material density']
+            if 'aerofoil section area' in turbine_zone_dict:
+                aerofoil_section_area = turbine_zone_dict['aerofoil section area']
+            elif 'aerofoil profile' in turbine_zone_dict:
+                if 'upper surface' in turbine_zone_dict['aerofoil profile']:
+                    upper = turbine_zone_dict['aerofoil profile']['upper surface']
+                else:
+                    if MPI.COMM_WORLD.Get_rank() == 0:
+                        print('AEROFOIL PROFILE NEEDS UPPER SURFACE')
+                if 'lower surface' in turbine_zone_dict['aerofoil profile']:
+                    lower = turbine_zone_dict['aerofoil profile']['lower surface']
+                else:
+                    if MPI.COMM_WORLD.Get_rank() == 0:
+                        print('AEROFOIL PROFILE NEEDS LOWER SURFACE')
+                x = np.concatenate((np.array(aerofoil['aerofoil profile']['lower surface']).T[0],
+                    np.array(aerofoil['aerofoil profile']['upper surface']).T[0][::-1][1:]))
+                y = np.concatenate((np.array(aerofoil['aerofoil profile']['lower surface']).T[1],
+                    np.array(aerofoil['aerofoil profile']['upper surface']).T[1][::-1][1:]))
+                aerofoil_section_area = polygon_area(x,y)
+            else:
+                if MPI.COMM_WORLD.Get_rank() == 0:
+                    print('CALCULATE ROTOR INERTIA NEEDS AEROFOIL SECTION AREA')
+            if 'number of blades' in turbine_zone_dict:
+                nblades = turbine_zone_dict['number of blades']
+            else:
+                if MPI.COMM_WORLD.Get_rank() == 0:
+                    print('CALCULATE ROTOR INERTIA NEEDS BLADE DEFINITION (NBLADES)')
+            if 'blade chord' in turbine_zone_dict:
+                blade_chord = np.array(turbine_zone_dict['blade chord'])
+            else:
+                if MPI.COMM_WORLD.Get_rank() == 0:
+                    print('BLADE ELEMENT THEORY NEEDS BLADE DEFINITION (CHORD)')
+            rotor_moment = 0.0
+            for r in np.linspace(ri, ro, 100):
+                dr = old_div((ro-ri),100)
+                c = np.interp(old_div(r,ro),blade_chord.T[0],blade_chord.T[1])*ro
+                rotor_moment += r*r*c*c*dr
+            rotor_moment = rotor_moment*blade_material_density*aerofoil_section_area*nblades
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('rotor moment of inertia = ' + str(rotor_moment))
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('INERTIA MODEL NEEDS MOMENT OF INERTIA')
+
+    if bet:
+        if 'number of blades' in turbine_zone_dict:
+            nblades = turbine_zone_dict['number of blades']
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('BLADE ELEMENT THEORY NEEDS BLADE DEFINITION (NBLADES)')
+        if 'aerofoil cl' in turbine_zone_dict:
+            aerofoil_cl = np.array(turbine_zone_dict['aerofoil cl'])
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('BLADE ELEMENT THEORY NEEDS AEROFOIL DEFINITION (CL)')
+        if 'aerofoil cd' in turbine_zone_dict:
+            aerofoil_cd = np.array(turbine_zone_dict['aerofoil cd'])
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('BLADE ELEMENT THEORY NEEDS AEROFOIL DEFINITION (CD)')
+        if 'blade chord' in turbine_zone_dict:
+            blade_chord = np.array(turbine_zone_dict['blade chord'])
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('BLADE ELEMENT THEORY NEEDS BLADE DEFINITION (CHORD)')
+        if 'blade twist' in turbine_zone_dict:
+            blade_twist = np.array(turbine_zone_dict['blade twist'])
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('BLADE ELEMENT THEORY NEEDS BLADE DEFINITION (TWIST)')
+        if 'blade pitch range' in turbine_zone_dict:
+            blade_pitch_range = turbine_zone_dict['blade pitch range']
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('BLADE PITCH AUTO NEEDS RANGE')
+            blade_pitch_range = [0.0,0.0]
+        if 'blade pitch tol' in turbine_zone_dict:
+            blade_pitch_tol = turbine_zone_dict['blade pitch tol']
+        else:
+            if MPI.COMM_WORLD.Get_rank() == 0:
+                print('BLADE PITCH NEEDS TOLERANCE')
+            blade_pitch_tol = 1e-3
+
+    if 'yaw' in turbine_zone_dict:
+        yaw = turbine_zone_dict['yaw']
+    else:
+        yaw = 0.0
+
+    if 'tilt' in turbine_zone_dict:
+        tilt = turbine_zone_dict['tilt']
+    else:
+        tilt = 0.0
+
+    if 'thrust coefficient curve' in turbine_zone_dict:
+        tc = np.interp(u_ref,
+                       np.array(turbine_zone_dict['thrust coefficient curve']).T[0],
+                       np.array(turbine_zone_dict['thrust coefficient curve']).T[1])
+    elif 'thrust coefficient' in turbine_zone_dict:
+        tc = turbine_zone_dict['thrust coefficient']
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print('NO THRUST COEFFICIENT SPECIFIED')
+
+    if 'tip speed ratio curve' in turbine_zone_dict:
+        ts = np.interp(u_ref,
+                       np.array(turbine_zone_dict['tip speed ratio curve']).T[0],
+                       np.array(turbine_zone_dict['tip speed ratio curve']).T[1])
+    elif 'tip speed ratio' in turbine_zone_dict:
+        ts = turbine_zone_dict['tip speed ratio']
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print('NO TIP SPEED RATIO SPECIFIED')
+
+    if induction and bet:
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print('CANNOT USE BLADE ELEMENT THEORY WITH INDUCTION MODEL')
+        induction = False
+
+    omega = old_div(ts*u_ref,ro)
+    if verbose and (MPI.COMM_WORLD.Get_rank() == 0):
+        print('tip speed ratio = ' + str(ts))
+        print('rotational speed = ' + str(omega) + ' rad/s')
+        print('wind speed = ' + str(u_ref) + ' m/s')
+        print('rotor swept area = ' + str(rotor_swept_area) + ' m^2')
+        print('density = ' + str(density) + ' kg/m^3')
+        print('number of segments = ' + str(number_of_segments))
+
+    betz_power = 0.5*density*u_ref**3*rotor_swept_area*(16.0/27.0)
+    b_vals = np.arange(0.3334,0.5,0.0001)
+    peters_lr_vals = []
+    for b in b_vals:
+        peters_lr_vals.append(old_div(math.sqrt(1.0+b)*(1.0-2.0*b),math.sqrt(3.0*b-1.0)))
+    b0 = np.interp(ts,peters_lr_vals[::-1],b_vals[::-1])
+    y = (3.0*b0-1.0)
+    glauert_power = 0.5*density*u_ref**3*rotor_swept_area*glauert_peters(y)
+
+    if betz:
+        power = betz_power
+    elif glauert:
+        power = glauert_power
+    elif 'turbine power curve' in turbine_zone_dict:
+        power = np.interp(u_ref,
+                          np.array(turbine_zone_dict['turbine power curve']).T[0],
+                          np.array(turbine_zone_dict['turbine power curve']).T[1])
+    elif 'turbine power' in turbine_zone_dict:
+        power = turbine_zone_dict['turbine power']
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print('NO POWER MODEL SPECIFIED - USING BETZ LIMIT')
+        power = betz_power
+
+    if bet:
+        def bet_kernel(beta_pitch):
+            dtheta = math.radians(360.0 / number_of_segments)
+            annulus = []
+            theta = 0.0
+            total_area = 0.0
+            total_thrust = 0.0
+            total_torque = 0.0
+            u_ref_local = u_ref*math.cos(math.radians(yaw))*math.cos(math.radians(tilt))
+            for i in range(number_of_segments):
+                r = ri
+                while r < ro:
+                    dr = old_div(dtheta * r, (1.0 - 0.5 * dtheta))
+                    max_r = r + dr
+                    if max_r > ro: dr = ro - r
+                    rp = r + 0.5 * dr
+                    da = dtheta * rp * dr
+                    #print 'Need to have the full velocity vector at every point on the actuator disk'
+                    #print 'A reference velocity woudl also be useful, to provide baseline Betz / Glauert scaling'
+                    #print 'This is also where yaw and tilt are ideally to be included in the BET model'
+                    omega_air = 0.0 # -0.1*omega (this should be calculated locally, with a value of 5% typical)
+                    omega_rel = omega - omega_air
+                    urel = math.sqrt((rp*omega_rel)**2 + u_ref_local**2)
+                    theta_rel = math.atan(old_div(u_ref_local,(rp*omega_rel)))
+                    beta_twist = np.interp(old_div(rp,ro),blade_twist.T[0],blade_twist.T[1])
+                    chord = np.interp(old_div(rp,ro),blade_chord.T[0],blade_chord.T[1])*ro
+                    beta = math.radians(beta_pitch + beta_twist)
+                    alpha = theta_rel - beta
+                    if verbose:
+                        if MPI.COMM_WORLD.Get_rank() == 0:
+                            if (alpha < 0.0): print('WARNING - negative angle of attack ' + str(alpha) + ' ' + str(beta))
+                    cl = np.interp(math.degrees(alpha),aerofoil_cl.T[0],aerofoil_cl.T[1])
+                    cd = np.interp(math.degrees(alpha),aerofoil_cd.T[0],aerofoil_cd.T[1])
+                    f_L = cl*0.5*density*urel**2*chord
+                    f_D = cd*0.5*density*urel**2*chord
+                    F_L = old_div(nblades,(2.0*math.pi*rp))*f_L
+                    F_D = old_div(nblades,(2.0*math.pi*rp))*f_D
+                    dt = (F_L*math.cos(theta_rel) + F_D*math.sin(theta_rel))*da
+                    dq = (F_L*math.sin(theta_rel) - F_D*math.cos(theta_rel))*da
+                    annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
+                    total_area += da
+                    total_thrust += dt
+                    total_torque += dq*rp
+                    r = r + dr
+            if ((MPI.COMM_WORLD.Get_rank() == 0) and verbose):
+                print(beta_pitch, total_torque, total_area, total_thrust)
+            return total_torque, total_area, total_thrust, annulus
+
+        blade_pitch = np.mean(gss(bet_kernel, blade_pitch_range[0], blade_pitch_range[1], blade_pitch_tol))
+        total_torque, total_area, total_thrust, annulus = bet_kernel(blade_pitch)
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            if verbose:
+                print('blade pitch = ' + str(blade_pitch) + ' degrees')
+                tc = old_div(total_thrust,(0.5*density*u_ref**2*rotor_swept_area))
+                print('thrust coefficient [calculated] = ' + str(tc))
+
+    else:
+        annulus = []
+        # Induction assumes that u_ref is u_inf.  Direct (Simple) assumes that u_ref is at disk.
+        if induction:
+        # Momentum theory: Ct = 4 * a * ( 1 - a), Cp = 4 * a * ( 1 - a)^2, Betz Optimal rotor: a = 1/3
+            if tc > 0.999:
+                print('INDUCTION MODEL TC CANNOT EXCEED 1.0: ' + str(tc))
+            ind_fac = old_div((4.0-math.sqrt(4.0*4.0-4.0*4.0*tc)),(2.0*4.0))
+            if verbose and (MPI.COMM_WORLD.Get_rank() == 0):
+                print('Induction factor: ', str(ind_fac))
+        dtheta = math.radians(360.0 / number_of_segments)
+        target_torque = old_div(power,omega)
+        theta = 0.0
+        total_area = 0.0
+        total_thrust = 0.0
+        total_torque = 0.0
+        for i in range(number_of_segments):
+            r = ri
+            while r < ro:
+                dr = old_div(dtheta * r, (1.0 - 0.5 * dtheta))
+                max_r = r + dr
+                if max_r > ro: dr = ro - r
+                rp = r + 0.5 * dr
+                da = dtheta * rp * dr
+                if induction:
+                    dt = 0.5*density*u_ref*u_ref*da*4.0*ind_fac*(1.0-ind_fac)
+                    lambda_r = old_div(rp * omega, u_ref)
+                    if lambda_r > 0.0:
+                        ang_ind_fac = -0.5 + math.sqrt(0.25+old_div(ind_fac*(1.0-ind_fac),lambda_r**2))
+                    else:
+                        ang_ind_fac = 0.0
+                    dq = 4.0*ang_ind_fac*(1.0-ind_fac)*0.5*density*u_ref*omega*rp*rp*da/rp
+                else:
+                    dt = 0.5*density*u_ref*u_ref*da*tc
+                    dq = old_div(target_torque*da,rotor_swept_area/rp)
+                annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
+                total_area += da
+                total_thrust += dt
+                total_torque += dq*rp
+                r = r + dr
+        specified_thrust = 0.5*rotor_swept_area*density*u_ref*u_ref*tc
+
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            if verbose:
+                print('thrust coefficient [specified] = ' + str(tc))
+                print('thrust [specified] = ' + str(specified_thrust))
+                print('model specified power = ' + str(power) + ' Watts')
+                print('target torque = ' + str(target_torque) + ' Joules/rad')
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        # print 'WARNING: Torque applied evenly over disc area'
-        # print 'wind speed = ' + str(u_ref) + ' m/s'
-        # print 'rotor swept area = ' + str(rotor_swept_area) + ' m^2'
-        # print 'thrust coefficient = ' + str(tc)
-        # print 'tip speed ratio = ' + str(ts)
-        # print 'turbine power = ' + str(power) + ' Watts'
-        # print 'density = ' + str(density) + ' kg/m^3'
-        # print 'number of segments = ' + str(number_of_segments)
-        # print 'rotational speed = ' + str(omega) + ' rad/s'
-        # print 'total thrust = ' + str(total_thrust) + ' Newtons'
-        # print 'total torque = ' + str(total_torque) + ' Joules/rad'
-        turbine_name_dict[turbine_name] = power
-
+        total_power = total_torque * omega
+        turbine_name_dict[turbine_name] = total_power
+        if verbose:
+            print('total area = ' + str(total_area) + ' m^2')
+            print('turbine power = ' + str(total_power) + ' Watts')
+            print('total thrust = ' + str(total_thrust) + ' Newtons')
+            print('total torque = ' + str(total_torque) + ' Joules/rad')
+            print('% of Betz limit power ' + str(old_div(100.0*total_power,betz_power)) + '%')
+            print('% of Glauert optimal power ' + str(old_div(100.0*total_power,glauert_power)) + '%')
     return annulus
-
-
-def create_turbine_segments_simple_nonuniform(turbine_zone_dict, u_ref, density, number_of_segments=12):
-    # turbine_zone_dict is a Python dictionary containing the fluid zone defintion for the turbine
-    # u_ref is the reference wind speed in metres / second
-    # density is is kg / cubic metre
-
-    from mpi4py import MPI
-    ri = turbine_zone_dict['inner radius']
-    ro = turbine_zone_dict['outer radius']
-    rotor_swept_area = (math.pi * ro * ro) - (math.pi * ri * ri)
-
-    tc = np.interp(u_ref,
-                   np.array(turbine_zone_dict['thrust coefficient curve']).T[0],
-                   np.array(turbine_zone_dict['thrust coefficient curve']).T[1])
-
-    ts = np.interp(u_ref,
-                   np.array(turbine_zone_dict['tip speed ratio curve']).T[0],
-                   np.array(turbine_zone_dict['tip speed ratio curve']).T[1])
-    # Calculate rotation speed from tip speed ratio
-    omega = ts * u_ref / ro
-
-    power = np.interp(u_ref,
-                      np.array(turbine_zone_dict['turbine power curve']).T[0],
-                      np.array(turbine_zone_dict['turbine power curve']).T[1])
-
-    total_thrust = 0.5 * density * rotor_swept_area * u_ref * u_ref * tc
-    total_torque = 0.0
-    if omega > 0.0:
-        total_torque = power / omega
-
-    if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'WARNING: Torque applied evenly over disc area'
-        print 'wind speed = ' + str(u_ref) + ' m/s'
-        print 'rotor swept area = ' + str(rotor_swept_area) + ' m^2'
-        print 'thrust coefficient = ' + str(tc)
-        print 'tip speed ratio = ' + str(ts)
-        print 'turbine power = ' + str(power) + ' Watts'
-        print 'density = ' + str(density) + ' kg/m^3'
-        print 'number of segments = ' + str(number_of_segments)
-        print 'rotational speed = ' + str(omega) + ' rad/s'
-        print 'total thrust = ' + str(total_thrust) + ' Newtons'
-        print 'total torque = ' + str(total_torque) + ' Joules/rad'
-
-    # Divide into segments
-    dtheta = math.radians(360.0 / number_of_segments)
-    annulus = []
-    theta = 0.0
-    area_check = 0.0
-    thrust_check = 0.0
-    for i in range(number_of_segments):
-        dr = 0.0
-        r = ri
-        while r < ro:
-            dr = dtheta * r / (1.0 - 0.5 * dtheta)
-            max_r = r + dr
-            if max_r > ro:
-                dr = ro - r
-            rp = r + 0.5 * dr
-            dt = total_thrust * (dtheta * rp * dr / rotor_swept_area)
-            dq = total_torque * (dtheta * rp * dr / rotor_swept_area)
-            annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
-            area_check = area_check + dtheta * rp * dr
-            thrust_check = thrust_check + dt
-            # print str(i) + ' ' + str(rp) + ' ' + str(dt) + ' ' + str(dq)
-            r = r + dr
-    # print annulus
-    return annulus
-
-
-def create_turbine_segments(thrust_coefficient, blade_inner_location,
-                            blade_radius,
-                            tip_speed_ratio, u_inf, density,
-                            turbine_name_dict={}, turbine_name="",
-                            number_of_segments=12, disc_loading_profile=[]):
-
-    # Local import to prevent mpi init call on import
-    from mpi4py import MPI
-
-    # Assuming constant circumferential variation of loading
-
-    radius_inner = blade_inner_location
-    radius_outer = blade_radius
-
-    # Betz Optimal rotor
-    # a = 1/3
-
-    # No wake rotation Betz limit
-    # Cp = 4 * a * ( 1 - a)^2
-    # Ct = 4 * a * ( 1 - a)
-
-    # With wake rotation
-
-    # dt
-    # dq
-
-    if thrust_coefficient > 0.999:
-        print 'Induction model expects thrust coefficient < 1.0'
-        print 'For greater range use simple turbine model'
-        print 'Specified thrust coeeficient = ' + str(thrust_coefficient)
-        print 'Resetting thrust coefficient to 0.8'
-        thrust_coefficient = 0.8
-
-    area = (math.pi * radius_outer * radius_outer) - math.pi * radius_inner * radius_inner
-    total_thrust = 0.5 * area * density * u_inf * u_inf * thrust_coefficient
-
-    induction_factor = (4.0 - math.sqrt(4.0 * 4.0 - 4.0 *
-                                        4.0 * thrust_coefficient)) / (2.0 * 4.0)
-    # Divide into segments
-    dtheta = math.radians(360.0 / number_of_segments)
-
-    # Calculate rotation speed from tip speed ratio
-    omega = tip_speed_ratio * u_inf / blade_radius
-
-    dr = 0.0
-    r = radius_inner
-    theta = 0.0
-    annulus = []
-    area_check = 0.0
-    thrust_check = 0.0
-    torque_check = 0.0
-    for i in range(number_of_segments):
-        dr = 0.0
-        r = radius_inner
-        while r < blade_radius:
-            # Calculate delta
-            dr = dtheta * r / (1.0 - 0.5 * dtheta)
-            # Check if we have exceeded radius
-            max_r = r + dr
-            if max_r > blade_radius:
-                dr = blade_radius - r
-            # Midpoint radius
-            rp = r + 0.5 * dr
-
-            da = dtheta * rp * dr
-
-            dt = 4.0 * induction_factor * \
-                (1.0 - induction_factor) * 0.5 * \
-                density * u_inf * u_inf * da
-
-            lamda_r = rp * omega / u_inf
-            angular_induction_factor = 0.0
-            if lamda_r > 0.0:
-                angular_induction_factor = -0.5 + \
-                    math.sqrt(0.25 + induction_factor *
-                              (1.0 - induction_factor) / lamda_r**2)
-            # Tangential force = torque / r
-            dq = 4.0 * angular_induction_factor * \
-                (1.0 - induction_factor) * 0.5 * density * \
-                u_inf * omega * rp * rp * da / rp
-
-            annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
-
-            area_check = area_check + da
-            thrust_check = thrust_check + dt
-            torque_check = torque_check + dq * rp
-
-            r = r + dr
-
-    if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'Betz Limit Induction factor: ', str(induction_factor)
-        print 'wind speed = ' + str(u_inf) + ' m/s'
-        print 'rotor swept area = ' + str(area) + ' m^2'
-        print 'thrust coefficient = ' + str(thrust_coefficient)
-        print 'tip speed ratio = ' + str(tip_speed_ratio)
-        print 'turbine power = ' + str(torque_check * omega) + ' Watts'
-        print 'density = ' + str(density) + ' kg/m^3'
-        print 'number of segments = ' + str(number_of_segments)
-        print 'rotational speed = ' + str(omega) + ' rad/s'
-        print 'total thrust = ' + str(thrust_check) + ' Newtons'
-        print 'total torque = ' + str(torque_check) + ' Joules/rad'
-        turbine_name_dict[turbine_name] = torque_check * omega
-
-    return annulus
-
 
 def project_to_plane(pt, plane_point, plane_normal):
     from numpy import dot
     # print pt,plane_point,plane_normal
     return pt - dot(pt - plane_point, plane_normal) * plane_normal
-
 
 def clockwise_angle(up_vector, pt_vector, plane_normal):
     from numpy import zeros, array, dot, linalg, cross
@@ -558,7 +729,6 @@ def clockwise_angle(up_vector, pt_vector, plane_normal):
         r += 2.0 * math.pi
 
     return r
-
 
 def convolution(disc, disc_centre, disc_radius, disc_normal, disc_up,
                 cell_centre_list, cell_volume_list):
@@ -609,21 +779,21 @@ def convolution(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
     # Broken: Cell_force_scaled will have a different struct to cell_force
     if thrust_check > 0.0:
-        thrust_factor = total_thrust / thrust_check
+        thrust_factor = old_div(total_thrust, thrust_check)
         # if MPI.COMM_WORLD.Get_rank() == 0:
         #    print 'Scaling thrust: ', thrust_factor
         cell_force_scaled = []
-        for cell in range(len(cell_force) / 3):
+        for cell in range(old_div(len(cell_force), 3)):
             cell_force_scaled.append((cell_force[cell * 3 + 0] * thrust_factor, cell_force[cell * 3 + 1] * thrust_factor, cell_force[cell * 3 + 2] * thrust_factor))
         return cell_force_scaled
     else:
         cell_force = ndarray.tolist(cell_force)
         cell_array = iter(cell_force)
-        return zip(cell_array, cell_array, cell_array)
+        return list(zip(cell_array, cell_array, cell_array))
 
     cell_force = ndarray.tolist(cell_force)
     cell_array = iter(cell_force)
-    return zip(cell_array, cell_array, cell_array)
+    return list(zip(cell_array, cell_array, cell_array))
 
 
 def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
@@ -691,21 +861,21 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 area = dtheta * disc_r * dr
 
-                dt_per_area = dt / area
-                dq_per_area = dq / area
+                dt_per_area = old_div(dt, area)
+                dq_per_area = old_div(dq, area)
 
                 disc_pt = disc_pt_list[idx]
                 # print disc_pt
 
                 distance_vec = array(cell_centre) - disc_pt
                 distance = math.sqrt(dot(distance_vec, distance_vec))
-                unit_distance_vec = distance_vec / distance
+                unit_distance_vec = old_div(distance_vec, distance)
 
                 epsilon = 2.0 * dr
 
                 # 3D kernel
                 eta = 1.0 / ((epsilon**2) * math.sqrt(math.pi) **
-                             3) * math.exp(-(distance / epsilon)**2)
+                             3) * math.exp(-(old_div(distance, epsilon))**2)
                 #/math.fabs(dot(disc_normal,unit_distance_vec))
 
                 weighted_sum[idx] += max(1.0e-16, eta *
@@ -741,7 +911,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
             if plane_pt_radius > 0.0:
                 #plane_pt_theta  = math.acos(dot([0.0,0.0,1.0],(plane_pt-disc_centre)/plane_pt_radius))
                 plane_pt_theta = clockwise_angle(
-                    disc_up, (plane_pt - disc_centre) / plane_pt_radius, array(disc_normal))
+                    disc_up, old_div((plane_pt - disc_centre), plane_pt_radius), array(disc_normal))
 
             min_index = -1
             for idx, segment in enumerate(disc):
@@ -770,8 +940,8 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 area = dtheta * disc_r * dr
 
-                dt_per_area = dt / area
-                dq_per_area = dq / area
+                dt_per_area = old_div(dt, area)
+                dq_per_area = old_div(dq, area)
 
                 distance_vec = array(cell_centre) - plane_pt
                 distance = math.sqrt(dot(distance_vec, distance_vec))
@@ -781,7 +951,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 # 1D kernel
                 eta = 1.0 / (epsilon * math.sqrt(math.pi)) * \
-                    math.exp(-(distance / epsilon)**2)
+                    math.exp(-(old_div(distance, epsilon))**2)
 
                 # Add max as eta may be zero due to underflow in the exponent
                 # term
@@ -813,21 +983,21 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 area = dtheta * disc_r * dr
 
-                dt_per_area = dt / area
-                dq_per_area = dq / area
+                dt_per_area = old_div(dt, area)
+                dq_per_area = old_div(dq, area)
 
                 disc_pt = disc_pt_list[idx]
                 # print disc_pt
 
                 distance_vec = array(cell_centre) - disc_pt
                 distance = math.sqrt(dot(distance_vec, distance_vec))
-                unit_distance_vec = distance_vec / distance
+                unit_distance_vec = old_div(distance_vec, distance)
 
                 epsilon = 2.0 * dr
 
                 # 3D kernel
                 eta = 1.0 / ((epsilon**2) * math.sqrt(math.pi) **
-                             3) * math.exp(-(distance / epsilon)**2)
+                             3) * math.exp(-(old_div(distance, epsilon))**2)
                 #/math.fabs(dot(disc_normal,unit_distance_vec))
 
                 redistribution_weight = weighted_sum[idx]
@@ -839,20 +1009,19 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 # Set thrust force
                 for i in range(3):
-                    cell_dt[i] += dt_per_area * area / \
-                        redistribution_weight * disc_normal[i] * eta
+                    cell_dt[i] += old_div(dt_per_area * area, redistribution_weight) * disc_normal[i] * eta
 
                 # Set torque force
                 # Vector for centre to pt
                 disc_vec = disc_pt - array(disc_centre)
                 disc_vec_mag = linalg.norm(disc_vec)
-                unit_disc_vec = disc_vec / disc_vec_mag
+                unit_disc_vec = old_div(disc_vec, disc_vec_mag)
                 torque_vector = cross(disc_normal, unit_disc_vec)
 
                 # Note converting torque to a force
                 for i in range(3):
-                    cell_dq[i] += dq_per_area * area / redistribution_weight * \
-                        torque_vector[i] * eta / disc_vec_mag
+                    cell_dq[i] += old_div(dq_per_area * area, redistribution_weight) * \
+                        old_div(torque_vector[i] * eta / disc_vec_mag)
         else:
             # Need for find nearest segment
 
@@ -867,7 +1036,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
             if plane_pt_radius > 0.0:
                 #plane_pt_theta  = math.acos(dot([0.0,0.0,1.0],(plane_pt-disc_centre)/plane_pt_radius))
                 plane_pt_theta = clockwise_angle(
-                    disc_up, (plane_pt - disc_centre) / plane_pt_radius, array(disc_normal))
+                    disc_up, old_div((plane_pt - disc_centre), plane_pt_radius), array(disc_normal))
 
             min_index = -1
             for idx, segment in enumerate(disc):
@@ -896,8 +1065,8 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 area = dtheta * disc_r * dr
 
-                dt_per_area = dt / area
-                dq_per_area = dq / area
+                dt_per_area = old_div(dt, area)
+                dq_per_area = old_div(dq, area)
 
                 distance_vec = array(cell_centre) - plane_pt
                 distance = math.sqrt(dot(distance_vec, distance_vec))
@@ -907,7 +1076,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 # 1D kernel
                 eta = 1.0 / (epsilon * math.sqrt(math.pi)) * \
-                    math.exp(-(distance / epsilon)**2)
+                    math.exp(-(old_div(distance, epsilon))**2)
 
                 redistribution_weight = weighted_sum[min_index]
 
@@ -917,20 +1086,20 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
 
                 # Set thrust force
                 for i in range(3):
-                    cell_dt[i] += dt_per_area * area / \
-                        redistribution_weight * disc_normal[i] * eta
+                    cell_dt[i] += old_div(dt_per_area * area, \
+                        redistribution_weight) * disc_normal[i] * eta
 
                 # Set torque force
                 # Vector for centre to pt
                 disc_vec = plane_pt - array(disc_centre)
                 disc_vec_mag = linalg.norm(disc_vec)
-                unit_disc_vec = disc_vec / disc_vec_mag
+                unit_disc_vec = old_div(disc_vec, disc_vec_mag)
                 torque_vector = cross(disc_normal, unit_disc_vec)
 
                 # Note converting torque to force
                 for i in range(3):
-                    cell_dq[i] += dq_per_area * area / redistribution_weight * \
-                        torque_vector[i] * eta / disc_vec_mag
+                    cell_dq[i] += old_div(dq_per_area * area, redistribution_weight) * \
+                        old_div(torque_vector[i] * eta / disc_vec_mag)
 
         cell_force.append((cell_dt[0] + cell_dq[0],
                            cell_dt[1] + cell_dq[1],
@@ -949,7 +1118,7 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
     thrust_check = thrust_check_total
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'Convolved total thrust: ', thrust_check
+        print('Convolved total thrust: ', thrust_check)
 
     #thrust_check = 0.0
     total_thrust = 0.0
@@ -960,12 +1129,12 @@ def convolution2(disc, disc_centre, disc_radius, disc_normal, disc_up,
         total_thrust += segment[0]
 
     if MPI.COMM_WORLD.Get_rank() == 0:
-        print 'Specified total thrust: ', total_thrust
+        print('Specified total thrust: ', total_thrust)
 
     if thrust_check > 0.0:
-        thrust_factor = total_thrust / thrust_check
+        thrust_factor = old_div(total_thrust, thrust_check)
         if MPI.COMM_WORLD.Get_rank() == 0:
-            print 'Scaling thrust: ', thrust_factor
+            print('Scaling thrust: ', thrust_factor)
         cell_force_scaled = []
         for cell in cell_force:
             force = cell
@@ -985,4 +1154,4 @@ def test_convolution():
     b = convolution(a, (0, 0, 0), (1, 0, 0), [(0.0, 0.0, 0.99)], [1.0])
     b = convolution(a, (0, 0, 0), (1, 0, 0), [(2.0, 0.0, 0.5)], [1.0])
 
-    print b
+    print(b)

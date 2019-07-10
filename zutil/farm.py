@@ -24,12 +24,18 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
+from __future__ import print_function
+from __future__ import absolute_import
+from __future__ import division
+from builtins import str
+from builtins import range
+from past.utils import old_div
 import math
 import ast
 import sys
 from paraview.simple import *
 import numpy as np
-import post
+from . import post
 import zutil
 import os
 from zutil import ABL
@@ -58,7 +64,7 @@ def create_mesh_sources(array_data_file, farm_centre, turbine_only=False):
     # Cases
     cases = array_data['Cases']
 
-    for (key, value) in cases.items():
+    for (key, value) in list(cases.items()):
         # print key
 
         # Wind direction
@@ -70,7 +76,7 @@ def create_mesh_sources(array_data_file, farm_centre, turbine_only=False):
         # List of tuples
         mesh_source_location = []
 
-        for (key, value) in turbines.items():
+        for (key, value) in list(turbines.items()):
             # print key
             name = key
             if isinstance(key, int):
@@ -145,7 +151,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
     # Cases
     cases = array_data['Cases']
 
-    for (key, value) in cases.items():
+    for (key, value) in list(cases.items()):
         # print key
 
         # Wind direction
@@ -157,7 +163,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
         # List of tuples
         location = []
 
-        for (key, value) in turbines.items():
+        for (key, value) in list(turbines.items()):
             # print key
             name = key
             if isinstance(key, int):
@@ -199,7 +205,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
             # Point turbine into the wind
             turbine_normal = [-u, -v, 0.0]
             mag = math.sqrt(sum(x**2 for x in turbine_normal))
-            turbine_normal = [-u / mag, -v / mag, 0.0]
+            turbine_normal = [old_div(-u, mag), old_div(-v, mag), 0.0]
 
             generate_turbine(name, turbine_location,
                              turbine_diameter, wind_direction, True)
@@ -231,7 +237,7 @@ def create_zcfd_input(array_data_file, farm_centre):
     # Cases
     cases = array_data['Cases']
 
-    for (key, value) in cases.items():
+    for (key, value) in list(cases.items()):
         # print key
 
         # Wind direction
@@ -248,7 +254,7 @@ def create_zcfd_input(array_data_file, farm_centre):
         # List of tuples
         location = []
 
-        for (key, value) in turbines.items():
+        for (key, value) in list(turbines.items()):
             # print key
             name = key
             if isinstance(key, int):
@@ -388,7 +394,7 @@ def create_source(turbine_location, diameter):
     # Radius
     radius = 0.5 * diameter * radial_factor
     # Mesh size
-    mesh_size = diameter / diameter_mesh_pts
+    mesh_size = old_div(diameter, diameter_mesh_pts)
 
     return ((pt_1, turbine_location[1], turbine_location[2], mesh_size, radius, radius * radius_factor),
             (pt_2, turbine_location[1], turbine_location[2], mesh_size, radius, radius * radius_factor))
@@ -485,12 +491,13 @@ def report_data_reader(name, arr1, arr2):
     var = -999.0
     idx = np.where(arr1 == name)
     if (len(idx[0].flat) == 0):
-        print 'farm.py : report_data_reader : no data found in results file for ' + name
+        print('farm.py : report_data_reader : no data found in results file for ' + name)
     elif (len(idx[0].flat) == 1):
         var = float(arr2[idx[0]][0])
     else:
-        print 'farm.py : report_data_reader : multiple columns in data results file for ' + name + ' ' + len(idx[0].flat)
+        print('farm.py : report_data_reader : multiple columns in data results file for ' + name + ' ' + len(idx[0].flat))
     return var
+
 
 min_dist = 1.0e16
 closest_point = [min_dist, min_dist, min_dist]
@@ -522,18 +529,18 @@ def write_windfarmer_data(case_name, num_processes, up):
     # Step 2: Determine the (conventional) wind direction from the case inflow
     # parameters
     v = case_data['IC_1']['V']['vector']
-    print 'farm.py : write_windfarmer_data : v = ' + str(v)
+    print('farm.py : write_windfarmer_data : v = ' + str(v))
     import numpy as np
     angle = 270.0 - np.angle(complex(v[0], v[1]), deg=True)
     if (angle < 0.0):
         angle += 360.0
     if (angle > 360.0):
         angle -= 360.0
-    print 'farm.py : write_windfarmer_data : angle = ' + str(angle)
+    print('farm.py : write_windfarmer_data : angle = ' + str(angle))
 
     # Step 3: Import the result file data incuding the probe data
     windfarmer_filename = case_name + "_" + str(angle) + '.out'
-    print 'farm.py : write_windfarmer_data : windfarmer_filename = ' + windfarmer_filename
+    print('farm.py : write_windfarmer_data : windfarmer_filename = ' + windfarmer_filename)
     report_file_name = case_name + '_report.csv'
     report_array = np.genfromtxt(report_file_name, dtype=None)
 
@@ -600,7 +607,7 @@ def write_windfarmer_data(case_name, num_processes, up):
             f.write(name + "," + str(x) + "," + str(y) + "," + str(zground) + "," + str(zhub) + "," +
                     str(zhub - zground) + "," + "," + str(angle) + "," + str(TI_hub) + ",,,,,," + str(VXY_hub) + ",,,,," +
                     str(Theta_hub) + ",,," + str(Local_Elevation_Angle) + ",,,,, \n")
-        print 'farm.py : write_windfarmer_data : DONE'
+        print('farm.py : write_windfarmer_data : DONE')
 
 
 def create_trbx_zcfd_input(case_name='windfarm',
@@ -624,19 +631,19 @@ def create_trbx_zcfd_input(case_name='windfarm',
 
     # Make sure that the turbine zone contains the reference point
     if (turbine_zone_length_factor < 2.5 * reference_point_offset):
-        print 'WARNING: Increasing Turbine Zone Length Factor from ' \
-            + str(turbine_zone_length_factor) + ' to ' + str(2.5 * reference_point_offset)
+        print('WARNING: Increasing Turbine Zone Length Factor from ' \
+            + str(turbine_zone_length_factor) + ' to ' + str(2.5 * reference_point_offset))
         turbine_zone_length_factor = 2.5 * reference_point_offset
     # Issue a warning if the turbine zone length factor is less than 1.0
     if (turbine_zone_length_factor < 1.0):
-        print 'WARNING: Turbine Zone Length Factor less than 1.0: ' + str(turbine_zone_length_factor)
+        print('WARNING: Turbine Zone Length Factor less than 1.0: ' + str(turbine_zone_length_factor))
     global min_dist, closest_point
     from xml.etree import ElementTree as ET
     local_surface = None
     if terrain_file is not None:
         reader = OpenDataFile(terrain_file)
         local_surface = servermanager.Fetch(reader)
-        print 'terrain file = ' + terrain_file
+        print('terrain file = ' + terrain_file)
         pointLocator = vtk.vtkPointLocator()
         pointLocator.SetDataSet(local_surface)
         pointLocator.BuildLocator()
@@ -649,7 +656,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
         with open(case_name + '_probes.py', 'w') as tp:
             tp.write('turb_probe = { \n')
             for [location_file_name, trbx_file_name] in turbine_files:
-                print 'trbx file name = ' + trbx_file_name
+                print('trbx file name = ' + trbx_file_name)
                 trbx = ET.ElementTree(file=trbx_file_name)
                 # ET.dump(trbx)
                 root = trbx.getroot()
@@ -671,7 +678,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         turbine_dict['DataTable'][wp][child.tag] = child.text
                     wp += 1
                 # print turbine_dict
-                print 'location file name = ' + location_file_name
+                print('location file name = ' + location_file_name)
                 location_array = np.genfromtxt(location_file_name, dtype=None)
                 # catch the case where only one turbine location is specified
                 if (location_array.ndim < 1):
@@ -687,9 +694,9 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     closest_point = [min_dist, min_dist, min_dist]
                     if local_surface is not None:
                         pid = pointLocator.FindClosestPoint([
-                                      easting, northing, 0.0])
+                            easting, northing, 0.0])
                         closest_point = local_surface.GetPoint(pid)
-                        #post.for_each(local_surface, closest_point_func, s=[
+                        # post.for_each(local_surface, closest_point_func, s=[
                         #              easting, northing, 0.0])
                         height = closest_point[2]
                         hub_z = height + float(turbine_dict['SelectedHeight'])
@@ -718,13 +725,13 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     tz.write('\'name\': \'' + name + '\',\n')
                     tz.write('\'def\':\'' + directory + name +
                              '-' + str(wind_direction) + '.vtp\',\n')
-                    if (len(turbine_dict['DataTable'].keys()) == 0):
-                        print 'WARNING: Windspeed DataTable empty - using Reference Wind Speed = ' + str(reference_wind_speed)
-                    wsc = np.zeros((4, len(turbine_dict['DataTable'].keys())))
+                    if (len(list(turbine_dict['DataTable'].keys())) == 0):
+                        print('WARNING: Windspeed DataTable empty - using Reference Wind Speed = ' + str(reference_wind_speed))
+                    wsc = np.zeros((4, len(list(turbine_dict['DataTable'].keys()))))
                     tcc_string = '['  # Thrust coefficient curve
                     tsc_string = '['  # Tip speed ratio curve
                     tpc_string = '['  # Turbine Power Curve
-                    for wp in turbine_dict['DataTable'].keys():
+                    for wp in list(turbine_dict['DataTable'].keys()):
                         # Allow velocities to be shifted by user specified calibration
                         wsc[0][wp] = float(turbine_dict['DataTable'][wp]['WindSpeed']) - calibration_offset
                         wsc[1][wp] = turbine_dict['DataTable'][wp]['ThrustCoEfficient']
@@ -732,7 +739,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         wsc[3][wp] = turbine_dict['DataTable'][wp]['PowerOutput']
                         tcc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[1][wp]) + '],'
                         tsc_string += '[' + str(wsc[0][wp]) + ',' + str(
-                            ((wsc[2][wp] * math.pi / 30.0) * rd / 2.0) / max(wsc[0][wp], 1.0)) + '],'
+                            old_div(((wsc[2][wp] * math.pi / 30.0) * rd / 2.0), max(wsc[0][wp], 1.0))) + '],'
                         tpc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[3][wp]) + '],'
                     tcc_string += ']'
                     tsc_string += ']'
@@ -746,7 +753,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
 
                     rs = np.interp(reference_wind_speed, wsc[0], wsc[2])
                     # The rotor speed is in revolutions per minute, so convert to tip speed ratio
-                    tsr = ((rs * math.pi / 30.0) * rd / 2.0) / reference_wind_speed
+                    tsr = old_div(((rs * math.pi / 30.0) * rd / 2.0), reference_wind_speed)
                     tz.write('\'tip speed ratio\':' + str(tsr) + ',\n')
                     tz.write('\'tip speed ratio curve\':' + tsc_string + ',\n')
 
@@ -816,14 +823,14 @@ def extract_probe_data(case_name='windfarm',
             probe.Update()
             V = VN.vtk_to_numpy(probe.GetOutput().GetPointData().GetArray('V'))
             ti = VN.vtk_to_numpy(probe.GetOutput().GetPointData().GetArray('ti'))
-            print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_x ' + str(V[0][0])
-            print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_y ' + str(V[0][1])
-            print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_z ' + str(V[0][2])
-            print str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_ti ' + str(ti[0] + 0.1)
+            print(str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_x ' + str(V[0][0]))
+            print(str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_y ' + str(V[0][1]))
+            print(str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_V_z ' + str(V[0][2]))
+            print(str(wd) + ' ' + name + '_zoffset_' + str(offset) + '_ti ' + str(ti[0] + 0.1))
 
 
 def generate_mesh_pts():
-    start = 2.0
+    start = 0.001
     max_height = 20000
     growth_rate = 1.3
 
@@ -850,27 +857,27 @@ def create_profile(profile_name, hub_height, hub_height_vel, direction, roughnes
     # Using RH Law compute utau using hub values
     utau = ABL.friction_velocity(hub_height_vel, hub_height, roughness, kappa)
 
-    print 'Friction Velocity: ' + str(utau)
+    print('Friction Velocity: ' + str(utau))
 
     # Ref http://orbit.dtu.dk/files/3737714/ris-r-1688.pdf
     coriolis_parameter = ABL.coriolis_parameter(latitude)
     geostrophic_plane = ABL.ekman_layer_height(utau, coriolis_parameter)
 
-    print 'Ekman Layer top: ' + str(geostrophic_plane)
-    print 'This is top of ABL for neutral conditions'
-    print 'Wall Stress: ' + str(rho * utau**2)
+    print('Ekman Layer top: ' + str(geostrophic_plane))
+    print('This is top of ABL for neutral conditions')
+    print('Wall Stress: ' + str(rho * utau**2))
 
     pts = generate_mesh_pts()
 
     vel = ABL.wind_speed_array(pts, utau, roughness, kappa)
 
     if scale_k:
-        k_scale = (np.ones(len(pts)) - np.minimum(np.ones(len(pts)), pts / geostrophic_plane))**2
+        k_scale = (np.ones(len(pts)) - np.minimum(np.ones(len(pts)), (pts/geostrophic_plane)))**2
     else:
         k_scale = np.ones(len(pts))
 
-    k = k_scale * (utau**2) / math.sqrt(cmu)
-    eps = np.ones(len(pts)) * (utau**3) / (kappa * (pts + roughness))
+    k = k_scale * (utau**2)/math.sqrt(cmu))
+    eps = (np.ones(len(pts)) * (utau**3) / (kappa * (pts + roughness)))
     # Note this mut/mu
     mut = np.maximum(rho * cmu * k**2 / (eps * mu), np.ones(len(pts))*min_mut)
     TI = np.maximum((2 * k / 3)**0.5 / vel, np.ones(len(pts))*min_ti)
@@ -910,7 +917,7 @@ def create_profile(profile_name, hub_height, hub_height_vel, direction, roughnes
     linesPolyData.GetPointData().AddArray(mut_vec)
 
     # Write
-    print 'Writing: ' + profile_name + '.vtp'
+    print('Writing: ' + profile_name + '.vtp')
     writer = vtk.vtkXMLPolyDataWriter()
     writer.SetFileName(profile_name + '.vtp')
     writer.SetInputData(linesPolyData)
@@ -1042,6 +1049,6 @@ parameters['IC_1']['profile']['field'] = '$profile_name.vtp'
                                                    wind_speed=wind_speed,
                                                    profile_name=profile_name
                                                    )
-    print 'Writing: ' + case_name + '.py'
+    print('Writing: ' + case_name + '.py')
     with open(case_name + '.py', 'w') as f:
         f.write(case_file_str)

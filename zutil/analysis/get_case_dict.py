@@ -1,3 +1,4 @@
+from __future__ import print_function
 import collections
 import yaml
 import os
@@ -5,9 +6,10 @@ import sys
 
 
 def invalid_definition(definition):
-    print "Invalid definition"
-    print definition
+    print("Invalid definition")
+    print(definition)
     raise
+
 
 # Dictionary of validation cases
 validation_dict = collections.OrderedDict()
@@ -40,13 +42,13 @@ def get_case_dict(default_test_file='generic.zcfd-test.yml'):
         try:
             test_definition = yaml.safe_load(test_definition_file)
         except yaml.YAMLError as exc:
-            print exc
+            print(exc)
 
     if test_definition is None:
         invalid_definition(test_definition)
 
     for step in test_definition:
-        if len(step.keys()) > 1:
+        if len(list(step.keys())) > 1:
             invalid_definition(test_definition)
 
         for key in step:
