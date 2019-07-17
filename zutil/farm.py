@@ -876,7 +876,7 @@ def create_profile(profile_name, hub_height, hub_height_vel, direction, roughnes
     else:
         k_scale = np.ones(len(pts))
 
-    k = k_scale * (utau**2)/math.sqrt(cmu))
+    k = k_scale * (utau**2)/math.sqrt(cmu)
     eps = (np.ones(len(pts)) * (utau**3) / (kappa * (pts + roughness)))
     # Note this mut/mu
     mut = np.maximum(rho * cmu * k**2 / (eps * mu), np.ones(len(pts))*min_mut)
