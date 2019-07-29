@@ -570,14 +570,19 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         print('density = ' + str(density) + ' kg/m^3')
         print('number of segments = ' + str(number_of_segments))
 
-    betz_power = 0.5*density*u_ref**3*rotor_swept_area*(16.0/27.0)
+    if (induction):
+        u_infty = u_ref
+    else:
+        u_infty = (3.0/2.0)*u_ref # Assuming 1D momentum theory and the Betz limit
+
+    betz_power = 0.5*density*u_infty**3*rotor_swept_area*(16.0/27.0)
     b_vals = np.arange(0.3334,0.5,0.0001)
     peters_lr_vals = []
     for b in b_vals:
         peters_lr_vals.append(old_div(math.sqrt(1.0+b)*(1.0-2.0*b),math.sqrt(3.0*b-1.0)))
     b0 = np.interp(ts,peters_lr_vals[::-1],b_vals[::-1])
     y = (3.0*b0-1.0)
-    glauert_power = 0.5*density*u_ref**3*rotor_swept_area*glauert_peters(y)
+    glauert_power = 0.5*density*u_infty**3*rotor_swept_area*glauert_peters(y)
 
     if betz:
         power = betz_power
@@ -612,7 +617,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                     rp = r + 0.5 * dr
                     da = dtheta * rp * dr
                     #print 'Need to have the full velocity vector at every point on the actuator disk'
-                    #print 'A reference velocity woudl also be useful, to provide baseline Betz / Glauert scaling'
+                    #print 'A reference velocity would also be useful, to provide baseline Betz / Glauert scaling'
                     #print 'This is also where yaw and tilt are ideally to be included in the BET model'
                     omega_air = 0.0 # -0.1*omega (this should be calculated locally, with a value of 5% typical)
                     omega_rel = omega - omega_air
@@ -685,7 +690,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                     dq = 4.0*ang_ind_fac*(1.0-ind_fac)*0.5*density*u_ref*omega*rp*rp*da/rp
                 else:
                     dt = 0.5*density*u_ref*u_ref*da*tc
-                    dq = old_div(target_torque*da,rotor_swept_area/rp)
+                    dq = old_div((target_torque*da),(rotor_swept_area*rp))
                 annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
                 total_area += da
                 total_thrust += dt
