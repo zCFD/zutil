@@ -205,7 +205,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
             # Point turbine into the wind
             turbine_normal = [-u, -v, 0.0]
             mag = math.sqrt(sum(x**2 for x in turbine_normal))
-            turbine_normal = [old_div(-u, mag), old_div(-v, mag), 0.0]
+            turbine_normal = [-u / mag, -v / mag, 0.0]
 
             generate_turbine(name, turbine_location,
                              turbine_diameter, wind_direction, True)
@@ -739,7 +739,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         wsc[3][wp] = turbine_dict['DataTable'][wp]['PowerOutput']
                         tcc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[1][wp]) + '],'
                         tsc_string += '[' + str(wsc[0][wp]) + ',' + str(
-                            old_div(((wsc[2][wp] * math.pi / 30.0) * rd / 2.0), max(wsc[0][wp], 1.0))) + '],'
+                            ((wsc[2][wp] * math.pi / 30.0) * rd / 2.0) / max(wsc[0][wp], 1.0)) + '],'
                         tpc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[3][wp]) + '],'
                     tcc_string += ']'
                     tsc_string += ']'
@@ -753,7 +753,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
 
                     rs = np.interp(reference_wind_speed, wsc[0], wsc[2])
                     # The rotor speed is in revolutions per minute, so convert to tip speed ratio
-                    tsr = old_div(((rs * math.pi / 30.0) * rd / 2.0), reference_wind_speed)
+                    tsr = ((rs * math.pi / 30.0) * rd / 2.0) / reference_wind_speed
                     tz.write('\'tip speed ratio\':' + str(tsr) + ',\n')
                     tz.write('\'tip speed ratio curve\':' + tsc_string + ',\n')
 
