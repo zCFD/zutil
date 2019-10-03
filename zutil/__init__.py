@@ -355,7 +355,80 @@ def gss(f,a,b,tol=1e-5):
     else:
         return (c,b)
 
-def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name_dict={}, turbine_name=""):
+def create_annulus(turbine_zone_dict):
+    from mpi4py import MPI
+
+    if 'verbose' in turbine_zone_dict:
+        verbose = turbine_zone_dict['verbose']
+    else:
+        verbose = False
+
+    if 'number of segments' in turbine_zone_dict:
+        number_of_segments = turbine_zone_dict['number of segments']
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0 and verbose:
+            print('NO NUMBER OF SEGMENTS SPECIFIED - SETTING TO DEFAULT 12')
+        number_of_segments = 12
+
+    if 'inner radius' in turbine_zone_dict:
+        ri = turbine_zone_dict['inner radius']
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print('NO INNER RADIUS SPECIFIED')
+
+    if 'outer radius' in turbine_zone_dict:
+        ro = turbine_zone_dict['outer radius']
+    else:
+        if MPI.COMM_WORLD.Get_rank() == 0:
+            print('NO OUTER RADIUS SPECIFIED')
+
+    disc_centre = turbine_zone_dict['centre']
+    disc_normal = turbine_zone_dict['normal']
+
+    rotor_swept_area = (math.pi * ro * ro) - (math.pi * ri * ri)
+
+    annulus = []
+    dtheta = math.radians(360.0 / number_of_segments)
+    theta = 0.0
+    total_area = 0.0
+    for i in range(number_of_segments):
+        r = ri
+        while r < ro:
+            dr = dtheta * r / (1.0 - 0.5 * dtheta)
+            max_r = r + dr
+            if max_r > ro: dr = ro - r
+            rp = r + 0.5 * dr
+            da = dtheta * rp * dr
+            disc_theta = i * dtheta + 0.5 * dtheta
+
+            disc_pt = array([rp * math.cos(disc_theta),
+                             rp * math.sin(disc_theta),
+                             0.0])
+
+            # print disc_pt
+            # Rotate so that z points in the direction of the normal
+            R = zeros((3, 3))
+            vector_orig = array([0.0, 0.0, 1.0])
+            vector_fin = zeros(3)
+            for i in range(3):
+                vector_fin[i] = disc_normal[i]
+            R_2vect(R, vector_orig, vector_fin)
+
+            disc_pt = dot(R, disc_pt)
+
+            # translate to disc centre
+            for i in range(3):
+                disc_pt[i] += disc_centre[i]
+
+            #disc_pt_list.append(disc_pt)
+
+            annulus.append((r, dr, i * dtheta, dtheta, disc_pt[0], disc_pt[1], disc_pt[2]))
+            total_area += da
+            r = r + dr
+
+    return annulus
+
+def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name_dict={}, turbine_name="", annulusVel=None):
     # turbine_zone_dict is a Python dictionary containing the fluid zone definition for the turbine
     # vel is the reference wind velocity in metres / second
     # density is is kg / cubic metre
