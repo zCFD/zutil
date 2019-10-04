@@ -357,6 +357,7 @@ def gss(f,a,b,tol=1e-5):
 
 def create_annulus(turbine_zone_dict):
     from mpi4py import MPI
+    from numpy import zeros, array, dot, linalg, cross
 
     if 'verbose' in turbine_zone_dict:
         verbose = turbine_zone_dict['verbose']
@@ -410,15 +411,15 @@ def create_annulus(turbine_zone_dict):
             R = zeros((3, 3))
             vector_orig = array([0.0, 0.0, 1.0])
             vector_fin = zeros(3)
-            for i in range(3):
-                vector_fin[i] = disc_normal[i]
+            for j in range(3):
+                vector_fin[j] = disc_normal[j]
             R_2vect(R, vector_orig, vector_fin)
 
             disc_pt = dot(R, disc_pt)
 
             # translate to disc centre
-            for i in range(3):
-                disc_pt[i] += disc_centre[i]
+            for j in range(3):
+                disc_pt[j] += disc_centre[j]
 
             #disc_pt_list.append(disc_pt)
 
