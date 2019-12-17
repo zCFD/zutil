@@ -1,8 +1,8 @@
 """ Helper functions for accessing Paraview functionality
 .. moduleauthor:: Zenotech Ltd
 """
-from __future__ import print_function
-from __future__ import division
+
+
 from future import standard_library
 standard_library.install_aliases()
 from builtins import str

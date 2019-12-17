@@ -24,9 +24,9 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
-from __future__ import print_function
-from __future__ import unicode_literals
-from __future__ import division
+
+
+
 
 from past.builtins import execfile
 from builtins import zip
@@ -37,13 +37,14 @@ import math
 import sys
 from os import path
 import numpy as np
+import imp
 
 
 def get_parameters_from_file(filename):
     conf = filename
     mymodule = __import__(conf)
     # Force a reload just in case it has already been loaded
-    reload(mymodule)
+    imp.reload(mymodule)
     return getattr(sys.modules[conf], 'parameters')
 
 
@@ -53,7 +54,7 @@ def include(filename):
     variables into the calling module
     """
     if path.exists(filename):
-        execfile(filename)
+        exec(compile(open(filename, "rb").read(), filename, 'exec'))
 
 
 def get_zone_info(module_name):

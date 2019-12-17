@@ -13,7 +13,7 @@ setup(name="zutil",
       packages=["zutil", "zutil.post", "zutil.analysis", "zutil.plot"],
       install_requires=[
           'future',
-          'ipython<6.0',
+          'ipython',
           'Fabric',
           'ipywidgets',
           'matplotlib',
