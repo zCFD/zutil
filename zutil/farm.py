@@ -802,13 +802,17 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         tz.write('\'reference plane\':True,\n')
                         tz.write('\'centre\':[' + str(easting) + ',' + str(northing) + ',' + str(hub_z) + '],\n')
                         tz.write('\'up\':[0.0,0.0,1.0],\n')
-                        tz.write('\'number of segments\':' + str(12) + ',\n')
+                        if 'number of segments' in turbine_dict:
+                            tz.write('\'number of segments\':' + str(turbine_dict['number of segments']) + ',\n')
+                        else:
+                            tz.write('\'number of segments\':' + str(12) + ',\n')
                         tz.write('\'normal\':[' + str(-wv[0]) + ',' + str(-wv[1]) + ',' + str(-wv[2]) + '],\n')
                         tz.write('\'tilt\':' + str(turbine_dict['tilt']) + ',\n')
                         tz.write('\'yaw\':' + str(turbine_dict['yaw']) + ',\n')
                         tz.write('\'mean blade material density\':' + str(turbine_dict['mean blade material density']) + ',\n')
                         tz.write('\'auto yaw\':True,\n')
                         tz.write('\'tip speed limit\':' + str(turbine_dict['tip speed limit']) + ',\n')
+                        tz.write('\'rpm ramp\':' + str(turbine_dict['rpm ramp']) + ',\n')
                         tz.write('\'blade pitch tol\':' + str(turbine_dict['blade pitch tol']) + ',\n')
                         tz.write('\'rated power\':' + str(turbine_dict['rated power']) + ',\n')
                         tz.write('\'dt\':' + str(turbine_dict['dt']) + ',\n')
@@ -882,7 +886,7 @@ def extract_probe_data(case_name='windfarm',
 def generate_mesh_pts():
     start = 0.001
     max_height = 20000
-    growth_rate = 1.3
+    growth_rate = 1.01
 
     pts = []
     # 1.3 growth rate to layer height
