@@ -527,7 +527,6 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
             rotor_moment = calculate_rotor_moment(turbine_zone_dict)
 
     if bet_prop:
-        # print('annulusVel = '+str(annulusVel))
         temp = np.reshape(annulusVel,(-1,3)).T
         u_ref = math.sqrt(np.mean(temp[0])**2 + np.mean(temp[1])**2 + np.mean(temp[2])**2)
         nblades = zone_default(turbine_zone_dict,'number of blades',3,verbose)
@@ -539,7 +538,8 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         ts = omega*ro/u_ref
         tip_loss_correction = 'tip loss correction' in turbine_zone_dict
         if tip_loss_correction:
-            tip_loss_correction_model = zone_default(turbine_zone_dict,'tip loss correction','None',verbose)
+            tip_loss_correction_model = zone_default(turbine_zone_dict,'tip loss correction','none',verbose)
+            tip_loss_correction_r = zone_default(turbine_zone_dict,'tip loss correction radius',0.0,verbose)
     elif bet:
         temp = np.reshape(annulusVel,(-1,3)).T
         u_ref = math.sqrt(np.mean(temp[0])**2 + np.mean(temp[1])**2 + np.mean(temp[2])**2)
@@ -562,7 +562,8 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         omega = zone_default(turbine_zone_dict,'omega',0.0,verbose)
         tip_loss_correction = 'tip loss correction' in turbine_zone_dict
         if tip_loss_correction:
-            tip_loss_correction_model = zone_default(turbine_zone_dict,'tip loss correction','None',verbose)
+            tip_loss_correction_model = zone_default(turbine_zone_dict,'tip loss correction','none',verbose)
+            tip_loss_correction_r = zone_default(turbine_zone_dict,'tip loss correction radius',0.0,verbose)
         if (u_ref < cut_in_speed) or (u_ref > cut_out_speed): omega = 0.0
         ts = omega*ro/u_ref
         if induction:
@@ -682,10 +683,13 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                 chord = np.interp(old_div(rp,ro),np.array(blade_chord).T[0],np.array(blade_chord).T[1])*ro
                 beta = math.radians(beta_twist)
                 alpha = beta - theta_rel
-                if (alpha < 0.0): alpha_positive = False
                 cl = np.interp(math.degrees(alpha),np.array(aerofoil_cl).T[0],np.array(aerofoil_cl).T[1])
-                if tip_loss_correction: cl = cl*math.sqrt(1.0-(rp/ro)**2) # only apply to lift, not drag.
                 cd = np.interp(math.degrees(alpha),np.array(aerofoil_cd).T[0],np.array(aerofoil_cd).T[1])
+                if tip_loss_correction:
+                    if rp > tip_loss_correction_r:
+                        tip_loss_factor = math.sqrt(1.0-(rp*(1.0-tip_loss_correction_r)/(ro-tip_loss_correction_r*rp))**2)
+                        cl = cl*tip_loss_factor
+                        cd = cd*tip_loss_factor
                 f_L = cl*0.5*density*urel**2*chord
                 f_D = cd*0.5*density*urel**2*chord
                 F_L = old_div(nblades,(2.0*math.pi*rp))*f_L
@@ -700,8 +704,6 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                 angular_induction += omega_air*da
                 r = r + dr
                 avindex = avindex + 1
-        if not alpha_positive:
-            if MPI.COMM_WORLD.Get_rank() == 0 and verbose: print('WARNING - negative angle of attack ')
         angular_induction = angular_induction/total_area
         total_power = total_torque * omega
         if MPI.COMM_WORLD.Get_rank() == 0:
