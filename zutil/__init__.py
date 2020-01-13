@@ -671,14 +671,13 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                     local_omega_vec = np.cross(rvec, disc_normal)
                 else:
                     local_omega_vec = np.cross(disc_normal, rvec)
-                omega_air = np.dot(local_omega_vec, ulocal)/rp
-                omega_rel = omega - omega_air
-                u_ref_local = -np.dot(ulocal,disc_normal)
-                urel = math.sqrt((rp*omega_rel)**2 + u_ref_local**2)
-                if (rp*omega_rel) > 0.0:
-                    theta_rel = math.atan(old_div(u_ref_local,(rp*omega_rel)))
+                v_n = -np.dot(ulocal,disc_normal)
+                v_r =  np.dot(ulocal,local_omega_vec)
+                if (abs((rp*omega)+v_r)) > 0.0:
+                    theta_rel = math.atan(v_n/((rp*omega)+v_r))
                 else:
                     theta_rel = math.pi/2.0
+                urel = math.sqrt((rp*omega + v_r)**2 + v_n**2)
                 beta_twist = np.interp(old_div(rp,ro),np.array(blade_twist).T[0],np.array(blade_twist).T[1])
                 chord = np.interp(old_div(rp,ro),np.array(blade_chord).T[0],np.array(blade_chord).T[1])*ro
                 beta = math.radians(beta_twist)
@@ -701,13 +700,10 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                 total_area += da
                 total_thrust += dt
                 total_torque += math.fabs(dq*rp)
-                angular_induction += omega_air*da
                 r = r + dr
                 avindex = avindex + 1
-        angular_induction = angular_induction/total_area
         total_power = total_torque * omega
-        if MPI.COMM_WORLD.Get_rank() == 0:
-            turbine_name_dict[turbine_name+'_ang_ind'] = angular_induction/omega
+
     elif bet:
         def bet_kernel(beta_pitch):
             dtheta = math.radians(360.0 / number_of_segments)
