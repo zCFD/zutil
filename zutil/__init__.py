@@ -696,7 +696,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                 F_D = old_div(nblades,(2.0*math.pi*rp))*f_D
                 dt =  -(F_L*math.cos(theta_rel) - F_D*math.sin(theta_rel))*da
                 dq =  (F_L*math.sin(theta_rel) + F_D*math.cos(theta_rel))*da
-                if rotation_direction == 'anticlockwise': dq = -dq
+                if rotation_direction == 'clockwise': dq = -dq
                 annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
                 total_area += da
                 total_thrust += dt
