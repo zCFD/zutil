@@ -19,12 +19,7 @@ if batch:
     else:
         matplotlib.use('agg')
 else:
-    if 'ipympl' in all_backends:
-        matplotlib.use('ipympl')
-    elif 'nbagg' in all_backends:
-        matplotlib.use('nbagg')
-    else:
-        matplotlib.use('nbAgg')
+    matplotlib.use('module://ipympl.backend_nbagg')
 
 matplotlib.rcParams['backend_fallback'] = False
 
