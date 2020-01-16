@@ -27,7 +27,7 @@ setup(name="zutil",
       install_requires=[
           'future',
           'ipython',
-          'Fabric',
+          'fabric>=2.5',
           'ipywidgets',
           'matplotlib',
           'numpy',
