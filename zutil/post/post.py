@@ -237,8 +237,8 @@ def calc_lift_centre_of_action(force, moment, ref_point):
     # spanwise centre ys0 at zs0
     # residual Mz moment (Mx=My=0) mzs0
 
-    xs0 = ref_point[0] - old_div(moment[1], force[2])
-    ys0 = ref_point[1] + old_div(moment[0], force[2])
+    xs0 = ref_point[0] - moment[1] / force[2]
+    ys0 = ref_point[1] + moment[0] / force[2]
 
     zs0 = ref_point[2]
     mzs0 = moment[2] - force[1] * \
@@ -252,8 +252,8 @@ def calc_drag_centre_of_action(force, moment, ref_point):
     # spanwise centre ys0 at zs0
     # residual Mz moment (Mx=My=0) mzs0
 
-    zs0 = ref_point[2] + old_div(moment[1], force[0])
-    ys0 = ref_point[1] - old_div(moment[2], force[0])
+    zs0 = ref_point[2] + moment[1] / force[0]
+    ys0 = ref_point[1] - moment[2] / force[0]
 
     xs0 = ref_point[0]
     # moment[2] - force[1]*(xs0-ref_point[0]) + force[0]*(ys0-ref_point[1])
@@ -545,6 +545,17 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
         point_data.UpdatePipeline()
         Delete(filter_data)
         del filter_data
+
+    surf = ExtractSurface(Input=point_data)
+    surf_normals = GenerateSurfaceNormals(Input=surf)
+    surf_normals.UpdatePipeline()
+
+    Delete(surf)
+    del surf
+    Delete(point_data)
+    del point_data
+
+    point_data = surf_normals
 
     slice = Slice(Input=point_data, SliceType="Plane")
 
