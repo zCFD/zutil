@@ -1,5 +1,6 @@
 language: python
 python:
     - 2.7
+    - 3.7
 install: sudo apt-get update -q && sudo apt-get install -y -q mpich libmpich-dev && pip install tox-travis
 script: tox
