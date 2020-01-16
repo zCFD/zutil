@@ -1,12 +1,12 @@
-from __future__ import print_function
+
 
 from builtins import str
 from builtins import range
 from paraview.simple import *
 
-from fabric.api import (env, run, cd, get, hide, settings,
-                        remote_tunnel, show, shell_env)
-from fabric.tasks import execute
+import fabric
+from invoke.context import Context
+from fabric import Connection
 
 from zutil import analysis
 
@@ -26,15 +26,15 @@ use_multiprocess = True
 # logger.setLevel(mp.SUBDEBUG)
 
 
-def pvserver(remote_dir, paraview_cmd, paraview_port, paraview_remote_port):
+def pvserver(c, remote_dir, paraview_cmd, paraview_port, paraview_remote_port):
 
-    with show('debug'), remote_tunnel(int(paraview_remote_port), local_port=int(paraview_port)), cd(remote_dir):
+    with c.forward_remote(remote_port=int(paraview_remote_port), local_port=int(paraview_port)), c.cd(remote_dir):
         # with cd(remote_dir):
         if not use_multiprocess:
-            run('sleep 2;' + paraview_cmd + '</dev/null &>/dev/null&', pty=False)
+            c.run('sleep 2;' + paraview_cmd + '</dev/null &>/dev/null&', pty=False)
         else:
             #    # run('sleep 2;'+paraview_cmd+'&>/dev/null',pty=False)
-            run('sleep 2;' + paraview_cmd)  # , pty=False)
+            c.run('sleep 2;' + paraview_cmd)  # , pty=False)
         # run(paraview_cmd+'</dev/null &>/dev/null',pty=False)
         # run('screen -d -m "yes"')
     # ssh asrc2 "(ls</dev/null &>/dev/null&) 2>&1; true" 2>/dev/null || echo
@@ -42,39 +42,35 @@ def pvserver(remote_dir, paraview_cmd, paraview_port, paraview_remote_port):
     # non-zero exit code $?
 
 
-def pvcluster(remote_dir, paraview_home, paraview_args,
+def pvcluster(c, remote_dir, paraview_home, paraview_args,
               paraview_port, paraview_remote_port, job_dict):
 
-    with show('debug'), remote_tunnel(int(paraview_remote_port), local_port=int(paraview_port)):
-        with shell_env(PARAVIEW_HOME=paraview_home, PARAVIEW_ARGS=paraview_args):
-            run('echo $PARAVIEW_HOME')
-            run('echo $PARAVIEW_ARGS')
-            run('mkdir -p ' + remote_dir)
-            with cd(remote_dir):
-                cmd_line = 'mycluster --create pvserver.job --jobname=pvserver'
-                cmd_line += ' --jobqueue ' + job_dict['job_queue']
-                cmd_line += ' --ntasks ' + job_dict['job_ntasks']
-                cmd_line += ' --taskpernode ' + job_dict['job_ntaskpernode']
-                if 'vizstack' in paraview_args:
-                    cmd_line += ' --script mycluster-viz-paraview.bsh'
-                else:
-                    cmd_line += ' --script mycluster-paraview.bsh'
-                cmd_line += ' --project ' + job_dict['job_project']
-                run(cmd_line)
-                run('chmod u+rx pvserver.job')
-                run('mycluster --immediate --submit pvserver.job')
+    with c.forward_remote(remote_port=int(paraview_remote_port), local_port=int(paraview_port)):
+        c.run('mkdir -p ' + remote_dir)
+        with c.cd(remote_dir):
+            cmd_line = 'mycluster --create pvserver.job --jobname=pvserver'
+            cmd_line += ' --jobqueue ' + job_dict['job_queue']
+            cmd_line += ' --ntasks ' + job_dict['job_ntasks']
+            cmd_line += ' --taskpernode ' + job_dict['job_ntaskpernode']
+            if 'vizstack' in paraview_args:
+                cmd_line += ' --script mycluster-viz-paraview.bsh'
+            else:
+                cmd_line += ' --script mycluster-paraview.bsh'
+            cmd_line += ' --project ' + job_dict['job_project']
+            c.run(cmd_line, env={'PARAVIEW_HOME':paraview_home,
+                                 'PARAVIEW_ARGS':paraview_args})
+            c.run('chmod u+rx pvserver.job')
+            c.run('mycluster --immediate --submit pvserver.job')
 
 
-def port_test(rport, lport):
+def port_test(c, rport, lport):
     # Run a test
-    with hide('everything'), remote_tunnel(int(rport), local_port=int(lport)):
-        run('cd')
+    with c.forward_remote(remote_port=int(rport), local_port=int(lport)):
+        c.run('cd', hide='everything')
 
 
-def run_uname(with_tunnel):
-
-    with hide('everything'):
-        run('uname -a')
+def run_uname(c, with_tunnel):
+    c.run('uname -a', hide='everything')
 
 
 def test_ssh(status, **kwargs):
@@ -82,8 +78,9 @@ def test_ssh(status, **kwargs):
     if 'data_host' in kwargs:
         _remote_host = kwargs['data_host']
     try:
-        env.use_ssh_config = True
-        execute(run_uname, False, hosts=[_remote_host])
+        #env.use_ssh_config = True
+        c = Connection(_remote_host)
+        run_uname(c, False)
     except:
         status.value = 0
         return False
@@ -110,8 +107,9 @@ def test_remote_tunnel(**kwargs):
         _remote_host = kwargs['data_host']
 
     try:
-        env.use_ssh_config = True
-        execute(run_uname, True, hosts=[_remote_host])
+        #env.use_ssh_config = True
+        c = Connection(_remote_host)
+        run_uname(c, True)
     except:
         return False
 
@@ -153,8 +151,9 @@ def get_remote_port(**kwargs):
 def test_remote_port(port_test, port, paraview_port, remote_host):
 
     try:
-        env.use_ssh_config = True
-        execute(port_test, port.value, paraview_port, hosts=[remote_host])
+        #env.use_ssh_config = True
+        c = Connection(remote_host)
+        port_test(c, port.value, paraview_port)
         return True
     except:
         port.value = 0
@@ -163,8 +162,9 @@ def test_remote_port(port_test, port, paraview_port, remote_host):
 
 def pvserver_start(remote_host, remote_dir, paraview_cmd):
     if paraview_cmd is not None:
-        env.use_ssh_config = True
-        execute(pvserver, remote_dir, paraview_cmd, hosts=[remote_host])
+        #env.use_ssh_config = True
+        c = Connection(remote_host)
+        pvserver(c, remote_dir, paraview_cmd)
 
 
 def pvserver_connect(**kwargs):
@@ -261,8 +261,9 @@ def pvserver_process(**kwargs):
         print('Attempting to find unused port in range 12000 to 13000')
         for p in range(12000, 13000):
             try:
-                env.use_ssh_config = True
-                execute(port_test, p, paraview_port, hosts=[_remote_host])
+                #env.use_ssh_config = True
+                c = Connection(_remote_host)
+                port_test(c, p, paraview_port)
                 break
             except:
                 pass
@@ -274,13 +275,7 @@ def pvserver_process(**kwargs):
 
         remote_hostname = _remote_host[_remote_host.find('@') + 1:]
 
-        if 'vizstack' in kwargs:
-            paraview_args = ('/opt/vizstack/bin/viz-paraview -r ' +
-                             str(kwargs['job_ntasks']) + ' -c ' +
-                             remote_hostname + ' -p ' +
-                             str(paraview_remote_port))
-        else:
-            paraview_args = (' -rc --client-host=' + remote_hostname +
+        paraview_args = (' -rc --client-host=' + remote_hostname +
                              ' -sp=' + str(paraview_remote_port))
 
         print(paraview_args)
@@ -292,10 +287,11 @@ def pvserver_process(**kwargs):
             'job_project': kwargs['job_project'],
         }
         if _paraview_home is not None:
-            env.use_ssh_config = True
-            execute(pvcluster, _remote_dir, _paraview_home, paraview_args,
+            #env.use_ssh_config = True
+            c = Connection(_remote_host)
+            pvcluster(c, _remote_dir, _paraview_home, paraview_args,
                     analysis.data.paraview_port, analysis.data.paraview_remote_port,
-                    job_dict, hosts=[_remote_host])
+                    job_dict)
     else:
         # Run Paraview
         if '-sp' in _paraview_cmd or '--client-host' in _paraview_cmd:
@@ -303,18 +299,15 @@ def pvserver_process(**kwargs):
                    'executable path and name without arguments')
             print('e.g. mpiexec -n 1 /path_to_pvserver/bin/pvserver')
             return False
-        if 'vizstack' in kwargs:
-            _paraview_cmd = (_paraview_cmd + ' -c localhost ' + ' -p ' +
-                             str(analysis.data.paraview_remote_port))
-        else:
-            _paraview_cmd = (_paraview_cmd +
+        _paraview_cmd = (_paraview_cmd +
                              ' -rc --client-host=localhost -sp=' +
                              str(analysis.data.paraview_remote_port))
 
         if _paraview_cmd is not None:
-            env.use_ssh_config = True
-            execute(pvserver, _remote_dir, _paraview_cmd, analysis.data.paraview_port,
-                    analysis.data.paraview_remote_port, hosts=[_remote_host])
+            #env.use_ssh_config = True
+            c = Connection(_remote_host)
+            pvserver(c, _remote_dir, _paraview_cmd, analysis.data.paraview_port,
+                    analysis.data.paraview_remote_port)
 
 
 def pvserver_disconnect():

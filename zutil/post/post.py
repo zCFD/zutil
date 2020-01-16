@@ -1,8 +1,8 @@
 """ Helper functions for accessing Paraview functionality
 .. moduleauthor:: Zenotech Ltd
 """
-from __future__ import print_function
-from __future__ import division
+
+
 from future import standard_library
 standard_library.install_aliases()
 from builtins import str
@@ -545,6 +545,17 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
         point_data.UpdatePipeline()
         Delete(filter_data)
         del filter_data
+
+    surf = ExtractSurface(Input=point_data)
+    surf_normals = GenerateSurfaceNormals(Input=surf)
+    surf_normals.UpdatePipeline()
+
+    Delete(surf)
+    del surf
+    Delete(point_data)
+    del point_data
+
+    point_data = surf_normals
 
     slice = Slice(Input=point_data, SliceType="Plane")
 
