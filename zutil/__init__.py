@@ -653,7 +653,6 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         total_torque = 0.0
         angular_induction = 0.0
         avindex = 0
-        alpha_positive = True # check whether any segments are at negative angle of attack.
         for i in range(number_of_segments):
             r = ri
             while r < ro:
@@ -674,7 +673,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                 v_n = -np.dot(ulocal,disc_normal)
                 v_r =  np.dot(ulocal,local_omega_vec)
                 if (abs((rp*omega)+v_r)) > 0.0:
-                    theta_rel = math.atan(v_n/((rp*omega)+v_r))
+                    theta_rel = math.atan(v_n/((rp*omega)-v_r))
                 else:
                     theta_rel = math.pi/2.0
                 urel = math.sqrt((rp*omega + v_r)**2 + v_n**2)
@@ -685,8 +684,9 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                 cl = np.interp(math.degrees(alpha),np.array(aerofoil_cl).T[0],np.array(aerofoil_cl).T[1])
                 cd = np.interp(math.degrees(alpha),np.array(aerofoil_cd).T[0],np.array(aerofoil_cd).T[1])
                 if tip_loss_correction:
-                    if rp > tip_loss_correction_r:
-                        tip_loss_factor = math.sqrt(1.0-(rp*(1.0-tip_loss_correction_r)/(ro-tip_loss_correction_r*rp))**2)
+                    rstar = tip_loss_correction_r*ro
+                    if rp > rstar:
+                        tip_loss_factor = math.sqrt(1.0-((rp-rstar)/(ro-rstar))**2)
                         cl = cl*tip_loss_factor
                         cd = cd*tip_loss_factor
                 f_L = cl*0.5*density*urel**2*chord
@@ -694,8 +694,8 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                 F_L = old_div(nblades,(2.0*math.pi*rp))*f_L
                 F_D = old_div(nblades,(2.0*math.pi*rp))*f_D
                 dt =  -(F_L*math.cos(theta_rel) - F_D*math.sin(theta_rel))*da
-                dq =  (F_L*math.sin(theta_rel) + F_D*math.cos(theta_rel))*da
-                if rotation_direction == 'clockwise': dq = -dq
+                dq =  -(F_L*math.sin(theta_rel) + F_D*math.cos(theta_rel))*da
+                if rotation_direction == 'anticlockwise': dq = -dq
                 annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
                 total_area += da
                 total_thrust += dt
