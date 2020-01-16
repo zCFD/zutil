@@ -37,7 +37,7 @@ import math
 import sys
 from os import path
 import numpy as np
-from mpi4py import MPI
+
 
 def get_parameters_from_file(filename):
     conf = filename
@@ -382,6 +382,7 @@ def gss(f,a,b,tol=1e-5):
         return (c,b)
 
 def create_annulus(turbine_zone_dict):
+    from mpi4py import MPI
     from numpy import zeros, array, dot, linalg, cross
 
     if 'verbose' in turbine_zone_dict:
@@ -475,6 +476,7 @@ def calculate_aerofoil_section_area(tzd):
     return aerofoil_section_area
 
 def calculate_rotor_moment(tzd):
+    from mpi4py import MPI
     nblades = zone_default(tzd,'number of blades',3,True)
     blade_material_density = zone_default(tzd,'mean blade material density',200.0,True)
     if 'aerofoil section area' in tzd:
@@ -496,6 +498,7 @@ def calculate_rotor_moment(tzd):
     return rotor_moment
 
 def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name_dict={}, turbine_name="", annulusVel=None, annulusTi=None):
+    from mpi4py import MPI
     verbose = zone_default(turbine_zone_dict,'verbose',True,False)
     number_of_segments = zone_default(turbine_zone_dict,'number of segments',12,verbose)
     rotation_direction = zone_default(turbine_zone_dict,'rotation direction','clockwise',verbose) # when viewed from the front
