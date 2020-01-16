@@ -546,6 +546,17 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
         Delete(filter_data)
         del filter_data
 
+    surf = ExtractSurface(Input=point_data)
+    surf_normals = GenerateSurfaceNormals(Input=surf)
+    surf_normals.UpdatePipeline()
+
+    Delete(surf)
+    del surf
+    Delete(point_data)
+    del point_data
+
+    point_data = surf_normals
+
     slice = Slice(Input=point_data, SliceType="Plane")
 
     slice.SliceType.Normal = slice_normal
