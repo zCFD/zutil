@@ -1,6 +1,6 @@
 future
 ipython==5.5.0
-fabric=>2.5
+fabric>-2.5
 ipywidgets==7.0.3
 matplotlib==2.1.2
 mpi4py==2.0.0
