@@ -205,7 +205,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
             # Point turbine into the wind
             turbine_normal = [-u, -v, 0.0]
             mag = math.sqrt(sum(x**2 for x in turbine_normal))
-            turbine_normal = [old_div(-u, mag), old_div(-v, mag), 0.0]
+            turbine_normal = [-u / mag, -v / mag, 0.0]
 
             generate_turbine(name, turbine_location,
                              turbine_diameter, wind_direction, True)
@@ -618,7 +618,7 @@ def create_trbx_zcfd_input(case_name='windfarm',
                            update_frequency=50,
                            reference_point_offset=1.0,
                            turbine_zone_length_factor=1.0,
-                           model='induction',  # options are (induction, simple)
+                           model='induction',  # options are (induction, simple, blade element theory)
                            turbine_files=[['xyz_location_file1.txt', 'turbine_type1.trbx'],
                                           ['xyz_location_file2.txt', 'turbine_type2.trbx']],
                            calibration_offset=0.0,
@@ -655,29 +655,34 @@ def create_trbx_zcfd_input(case_name='windfarm',
         tz.write('turb_zone = {\n')
         with open(case_name + '_probes.py', 'w') as tp:
             tp.write('turb_probe = { \n')
-            for [location_file_name, trbx_file_name] in turbine_files:
-                print('trbx file name = ' + trbx_file_name)
-                trbx = ET.ElementTree(file=trbx_file_name)
-                # ET.dump(trbx)
-                root = trbx.getroot()
-                turbine_dict = {}
-                # print elem.tag, elem.attrib
-                for elem in root:
-                    turbine_dict[elem.tag] = elem.text
-                for elem in trbx.find('Turbine3DModel'):
-                    turbine_dict[elem.tag] = elem.text
-                for elem in trbx.find('PerformanceTableList/PerformanceTable/PowerCurveInfo'):
-                    turbine_dict[elem.tag] = elem.text
-                for elem in trbx.find('PerformanceTableList/PerformanceTable/PowerCurveInfo/StartStopStrategy'):
-                    turbine_dict[elem.tag] = elem.text
-                turbine_dict['DataTable'] = {}
-                wp = 0
-                for elem in trbx.find('PerformanceTableList/PerformanceTable/DataTable'):
-                    turbine_dict['DataTable'][wp] = {}
-                    for child in elem:
-                        turbine_dict['DataTable'][wp][child.tag] = child.text
-                    wp += 1
-                # print turbine_dict
+            for turbine_type in turbine_files:
+                location_file_name = turbine_type[0]
+                if model in ('simple','induction'):
+                    trbx_file_name = turbine_type[1]
+                    print('trbx file name = ' + trbx_file_name)
+                    trbx = ET.ElementTree(file=trbx_file_name)
+                    root = trbx.getroot()
+                    turbine_dict = {}
+                    for elem in root:
+                        turbine_dict[elem.tag] = elem.text
+                    for elem in trbx.find('Turbine3DModel'):
+                        turbine_dict[elem.tag] = elem.text
+                    for elem in trbx.find('PerformanceTableList/PerformanceTable/PowerCurveInfo'):
+                        turbine_dict[elem.tag] = elem.text
+                    for elem in trbx.find('PerformanceTableList/PerformanceTable/PowerCurveInfo/StartStopStrategy'):
+                        turbine_dict[elem.tag] = elem.text
+                    turbine_dict['DataTable'] = {}
+                    wp = 0
+                    for elem in trbx.find('PerformanceTableList/PerformanceTable/DataTable'):
+                        turbine_dict['DataTable'][wp] = {}
+                        for child in elem:
+                            turbine_dict['DataTable'][wp][child.tag] = child.text
+                        wp += 1
+                elif model in ('blade element theory'):
+                    turbine_dict = turbine_type[1]
+                else:
+                    print('Model not identified (simple, induction, blade element theory)')
+
                 print('location file name = ' + location_file_name)
                 location_array = np.genfromtxt(location_file_name, dtype=None)
                 # catch the case where only one turbine location is specified
@@ -690,93 +695,143 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     northing = location[2]
 
                     # Step 2: Work out the local elevation
+                    if model in ('simple','induction'):
+                        hub_height = turbine_dict['SelectedHeight']
+                        rd = float(turbine_dict['RotorDiameter'])
+                    elif model in ('blade element theory'):
+                        hub_height = turbine_dict['hub height']
+                        rd = float(turbine_dict['outer radius'])*2.0
+                    else:
+                        print('Model not identified (simple, induction, blade element theory)')
+
                     min_dist = 1.0e16
                     closest_point = [min_dist, min_dist, min_dist]
                     if local_surface is not None:
-                        pid = pointLocator.FindClosestPoint([
-                            easting, northing, 0.0])
+                        pid = pointLocator.FindClosestPoint([easting, northing, 0.0])
                         closest_point = local_surface.GetPoint(pid)
-                        # post.for_each(local_surface, closest_point_func, s=[
-                        #              easting, northing, 0.0])
                         height = closest_point[2]
-                        hub_z = height + float(turbine_dict['SelectedHeight'])
+                        hub_z = height + float(hub_height)
                     else:
-                        hub_z = float(turbine_dict['SelectedHeight'])
+                        hub_z = float(hub_height)
 
                     # Step 3: Generate the turbine region files
                     # (./turbine_vtp/*.vtp)
-                    rd = float(turbine_dict['RotorDiameter'])
                     generate_turbine_region(directory + name,
                                             [easting, northing, hub_z],
-                                            float(turbine_dict['RotorDiameter']),
+                                            float(rd),
                                             wind_direction,
                                             turbine_zone_length_factor,
                                             True)
                     generate_turbine(directory + name,
                                      [easting, northing, hub_z],
-                                     float(turbine_dict['RotorDiameter']),
+                                     float(rd),
                                      wind_direction,
                                      True)
 
                     # Step 4: Generate the turbine zone definition
                     # (./turbine_zone.py)
-                    tz.write('\'FZ_' + str(idx) + '\':{\n')
-                    tz.write('\'type\':\'disc\',\n')
-                    tz.write('\'name\': \'' + name + '\',\n')
-                    tz.write('\'def\':\'' + directory + name +
-                             '-' + str(wind_direction) + '.vtp\',\n')
-                    if (len(list(turbine_dict['DataTable'].keys())) == 0):
-                        print('WARNING: Windspeed DataTable empty - using Reference Wind Speed = ' + str(reference_wind_speed))
-                    wsc = np.zeros((4, len(list(turbine_dict['DataTable'].keys()))))
-                    tcc_string = '['  # Thrust coefficient curve
-                    tsc_string = '['  # Tip speed ratio curve
-                    tpc_string = '['  # Turbine Power Curve
-                    for wp in list(turbine_dict['DataTable'].keys()):
-                        # Allow velocities to be shifted by user specified calibration
-                        wsc[0][wp] = float(turbine_dict['DataTable'][wp]['WindSpeed']) - calibration_offset
-                        wsc[1][wp] = turbine_dict['DataTable'][wp]['ThrustCoEfficient']
-                        wsc[2][wp] = turbine_dict['DataTable'][wp]['RotorSpeed']
-                        wsc[3][wp] = turbine_dict['DataTable'][wp]['PowerOutput']
-                        tcc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[1][wp]) + '],'
-                        tsc_string += '[' + str(wsc[0][wp]) + ',' + str(
-                            old_div(((wsc[2][wp] * math.pi / 30.0) * rd / 2.0), max(wsc[0][wp], 1.0))) + '],'
-                        tpc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[3][wp]) + '],'
-                    tcc_string += ']'
-                    tsc_string += ']'
-                    tpc_string += ']'
-                    # print wsc
-                    # If there is a single value for thrust coefficient use the
-                    # reference wind speed
-                    tc = np.interp(reference_wind_speed, wsc[0], wsc[1])
-                    tz.write('\'thrust coefficient\':' + str(tc) + ',\n')
-                    tz.write('\'thrust coefficient curve\':' + tcc_string + ',\n')
-
-                    rs = np.interp(reference_wind_speed, wsc[0], wsc[2])
-                    # The rotor speed is in revolutions per minute, so convert to tip speed ratio
-                    tsr = old_div(((rs * math.pi / 30.0) * rd / 2.0), reference_wind_speed)
-                    tz.write('\'tip speed ratio\':' + str(tsr) + ',\n')
-                    tz.write('\'tip speed ratio curve\':' + tsc_string + ',\n')
-
-                    tpc = np.interp(reference_wind_speed, wsc[0], wsc[3])
-                    tz.write('\'turbine power\':' + str(tpc) + ',\n')
-                    tz.write('\'turbine power curve\':' + tpc_string + ',\n')
-
-                    tz.write('\'centre\':[' + str(easting) + ',' + str(northing) + ',' + str(hub_z) + '],\n')
-                    tz.write('\'up\':[0.0,0.0,1.0],\n')
                     wv = zutil.vector_from_wind_dir(wind_direction)
-                    tz.write('\'normal\':[' + str(-wv[0]) + ',' + str(-wv[1]) + ',' + str(-wv[2]) + '],\n')
-                    tz.write('\'inner radius\':' + str(float(turbine_dict['DiskDiameter']) / 2.0) + ',\n')
-                    tz.write('\'outer radius\':' + str(float(turbine_dict['RotorDiameter']) / 2.0) + ',\n')
+                    if model in ('simple','induction'):
+                        tz.write('\'FZ_' + str(idx) + '\':{\n')
+                        tz.write('\'type\':\'disc\',\n')
+                        tz.write('\'name\': \'' + name + '\',\n')
+                        tz.write('\'def\':\'' + directory + name + '-' + str(wind_direction) + '.vtp\',\n')
+                        if (len(list(turbine_dict['DataTable'].keys())) == 0):
+                            print('WARNING: Windspeed DataTable empty - using Reference Wind Speed = ' + str(reference_wind_speed))
+                        wsc = np.zeros((4, len(list(turbine_dict['DataTable'].keys()))))
+                        tcc_string = '['  # Thrust coefficient curve
+                        tsc_string = '['  # Tip speed ratio curve
+                        tpc_string = '['  # Turbine Power Curve
+                        for wp in list(turbine_dict['DataTable'].keys()):
+                            # Allow velocities to be shifted by user specified calibration
+                            wsc[0][wp] = float(turbine_dict['DataTable'][wp]['WindSpeed']) - calibration_offset
+                            wsc[1][wp] = turbine_dict['DataTable'][wp]['ThrustCoEfficient']
+                            wsc[2][wp] = turbine_dict['DataTable'][wp]['RotorSpeed']
+                            wsc[3][wp] = turbine_dict['DataTable'][wp]['PowerOutput']
+                            tcc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[1][wp]) + '],'
+                            tsc_string += '[' + str(wsc[0][wp]) + ',' + str(
+                                ((wsc[2][wp] * math.pi / 30.0) * rd / 2.0) / max(wsc[0][wp], 1.0)) + '],'
+                            tpc_string += '[' + str(wsc[0][wp]) + ',' + str(wsc[3][wp]) + '],'
+                        tcc_string += ']'
+                        tsc_string += ']'
+                        tpc_string += ']'
+                        # print wsc
+                        # If there is a single value for thrust coefficient use the
+                        # reference wind speed
+                        tc = np.interp(reference_wind_speed, wsc[0], wsc[1])
+                        tz.write('\'thrust coefficient\':' + str(tc) + ',\n')
+                        tz.write('\'thrust coefficient curve\':' + tcc_string + ',\n')
 
-                    pref = [easting - reference_point_offset * rd * wv[0],
-                            northing - reference_point_offset * rd * wv[1],
-                            hub_z - reference_point_offset * rd * wv[2]]
+                        rs = np.interp(reference_wind_speed, wsc[0], wsc[2])
+                        # The rotor speed is in revolutions per minute, so convert to tip speed ratio
+                        tsr = ((rs * math.pi / 30.0) * rd / 2.0) / reference_wind_speed
+                        tz.write('\'tip speed ratio\':' + str(tsr) + ',\n')
+                        tz.write('\'tip speed ratio curve\':' + tsc_string + ',\n')
 
-                    tz.write('\'reference plane\':True,\n')
-                    tz.write('\'reference point\':[' + str(pref[0]) + ',' + str(pref[1]) + ',' + str(pref[2]) + '],\n')
-                    tz.write('\'update frequency\':' + str(update_frequency) + ',\n')
-                    tz.write('\'model\':' + ' \'' + model + '\',\n')
-                    tz.write('},\n')
+                        tpc = np.interp(reference_wind_speed, wsc[0], wsc[3])
+                        tz.write('\'turbine power\':' + str(tpc) + ',\n')
+                        tz.write('\'turbine power curve\':' + tpc_string + ',\n')
+
+                        tz.write('\'centre\':[' + str(easting) + ',' + str(northing) + ',' + str(hub_z) + '],\n')
+                        tz.write('\'up\':[0.0,0.0,1.0],\n')
+                        tz.write('\'normal\':[' + str(-wv[0]) + ',' + str(-wv[1]) + ',' + str(-wv[2]) + '],\n')
+                        tz.write('\'inner radius\':' + str(float(turbine_dict['DiskDiameter']) / 2.0) + ',\n')
+                        tz.write('\'outer radius\':' + str(float(turbine_dict['RotorDiameter']) / 2.0) + ',\n')
+
+                        pref = [easting - reference_point_offset * rd * wv[0],
+                                northing - reference_point_offset * rd * wv[1],
+                                hub_z - reference_point_offset * rd * wv[2]]
+
+                        tz.write('\'reference plane\':True,\n')
+                        tz.write('\'reference point\':[' + str(pref[0]) + ',' + str(pref[1]) + ',' + str(pref[2]) + '],\n')
+                        tz.write('\'update frequency\':' + str(update_frequency) + ',\n')
+                        tz.write('\'model\':' + ' \'' + model + '\',\n')
+                        tz.write('},\n')
+                    elif model in ('blade element theory'):
+                        tz.write('\'FZ_' + str(idx) + '\':{\n')
+                        tz.write('\'type\':\'disc\',\n')
+                        tz.write('\'name\': \'' + name + '\',\n')
+                        tz.write('\'status\':\'on\',\n')
+                        tz.write('\'number of blades\':' + str(turbine_dict['number of blades']) + ',\n')
+                        tz.write('\'inner radius\':' + str(float(turbine_dict['inner radius'])) + ',\n')
+                        tz.write('\'outer radius\':' + str(float(turbine_dict['outer radius'])) + ',\n')
+                        tz.write('\'model\':\'blade element theory\',\n')
+                        tz.write('\'def\':\'' + directory + name + '-' + str(wind_direction) + '.vtp\',\n')
+                        tz.write('\'verbose\':False,\n')
+                        tz.write('\'update frequency\':' + str(update_frequency) + ',\n')
+                        tz.write('\'reference plane\':True,\n')
+                        tz.write('\'centre\':[' + str(easting) + ',' + str(northing) + ',' + str(hub_z) + '],\n')
+                        tz.write('\'up\':[0.0,0.0,1.0],\n')
+                        if 'number of segments' in turbine_dict:
+                            tz.write('\'number of segments\':' + str(turbine_dict['number of segments']) + ',\n')
+                        else:
+                            tz.write('\'number of segments\':' + str(12) + ',\n')
+                        tz.write('\'normal\':[' + str(-wv[0]) + ',' + str(-wv[1]) + ',' + str(-wv[2]) + '],\n')
+                        tz.write('\'tilt\':' + str(turbine_dict['tilt']) + ',\n')
+                        tz.write('\'yaw\':' + str(turbine_dict['yaw']) + ',\n')
+                        tz.write('\'mean blade material density\':' + str(turbine_dict['mean blade material density']) + ',\n')
+                        tz.write('\'auto yaw\':True,\n')
+                        tz.write('\'tip speed limit\':' + str(turbine_dict['tip speed limit']) + ',\n')
+                        tz.write('\'rpm ramp\':' + str(turbine_dict['rpm ramp']) + ',\n')
+                        tz.write('\'blade pitch tol\':' + str(turbine_dict['blade pitch tol']) + ',\n')
+                        tz.write('\'rated power\':' + str(turbine_dict['rated power']) + ',\n')
+                        tz.write('\'dt\':' + str(turbine_dict['dt']) + ',\n')
+                        tz.write('\'inertia\':True,\n')
+                        tz.write('\'damage ti\':' + str(turbine_dict['damage ti']) + ',\n')
+                        tz.write('\'damage speed\':' + str(turbine_dict['damage speed']) + ',\n')
+                        tz.write('\'friction loss\':' + str(turbine_dict['friction loss']) + ',\n')
+                        tz.write('\'cut in speed\':' + str(turbine_dict['cut in speed']) + ',\n')
+                        tz.write('\'cut out speed\':' + str(turbine_dict['cut out speed']) + ',\n')
+                        tz.write('\'rotation direction\':\'clockwise\',\n')
+                        tz.write('\'aerofoil profile\':' + str(turbine_dict['aerofoil profile']) + ',\n')
+                        tz.write('\'aerofoil cl\':' + str(turbine_dict['aerofoil cl']) + ',\n')
+                        tz.write('\'aerofoil cd\':' + str(turbine_dict['aerofoil cd']) + ',\n')
+                        tz.write('\'blade chord\':' + str(turbine_dict['blade chord']) + ',\n')
+                        tz.write('\'blade twist\':' + str(turbine_dict['blade twist']) + ',\n')
+                        tz.write('\'blade pitch range\':' + str(turbine_dict['blade pitch range']) + ',\n')
+                        tz.write('},\n')
+                    else:
+                        pass
 
                     # Step 5: Generate the turbine monitor probes (./turbine_probe.py)
                     # Turbines:    label@MHH@## (## = hub height of the turbine relative to the ground in meters)
@@ -784,14 +839,13 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     # above the ground in meters)
                     tp.write('        \'MR_' + str(idx) + '\' : {\n')
                     tp.write('        \'name\' :\'probe' + str(idx) +
-                             '@MHH@' + turbine_dict['SelectedHeight'] + '\',\n')
+                             '@MHH@' + str(hub_height) + '\',\n')
                     tp.write(
                         '        \'point\' : [' + str(easting) + ',' + str(northing) + ',' + str(hub_z) + '],\n')
                     tp.write('        \'variables\' : [\'V\', \'ti\'],\n')
                     tp.write('        },\n')
             tp.write('} \n')
         tz.write('}\n')
-
 
 def extract_probe_data(case_name='windfarm',
                        wind_direction_start=0,
@@ -832,7 +886,7 @@ def extract_probe_data(case_name='windfarm',
 def generate_mesh_pts():
     start = 0.001
     max_height = 20000
-    growth_rate = 1.3
+    growth_rate = 1.01
 
     pts = []
     # 1.3 growth rate to layer height
@@ -997,14 +1051,14 @@ def generate_inputs(base_case, wind_direction, wind_speed, wind_height, roughnes
     create_trbx_zcfd_input(case_name=case_name,
                            wind_direction=wind_direction,
                            reference_wind_speed=wind_speed,
-                           num_processes=32,
+                           terrain_file=terrain_file,
                            report_frequency=10,
                            update_frequency=1,
-                           terrain_file=terrain_file,
                            reference_point_offset=0.0,
                            turbine_zone_length_factor=0.2,
                            model='simple',
-                           turbine_files=turbine_info)
+                           turbine_files=turbine_info,
+                           calibration_offset=0.0)
 
     # Generate profile
     create_profile(profile_name, wind_height, wind_speed, wind_direction,

@@ -45,14 +45,14 @@ def ekman_layer_height(friction_velocity, coriolis_parameter):
     returns the height of the atmospheric boundary layer - Geostrophic height
     For neutral conditions this is the height of the ABL
     """
-    return old_div(friction_velocity, (6.0 * coriolis_parameter))
+    return friction_velocity / (6.0 * coriolis_parameter)
 
 
 def friction_velocity(wind_speed, height, roughness_length, kappa=0.41):
     """
     returns the friction velocity
     """
-    return old_div(wind_speed * kappa, math.log(old_div(height, roughness_length)))
+    return wind_speed * kappa / math.log(height / roughness_length)
 
 
 def wind_speed(height, friction_velocity, roughness_length, kappa=0.41):
@@ -61,7 +61,7 @@ def wind_speed(height, friction_velocity, roughness_length, kappa=0.41):
 
     May want to consider Deaves & Harris (1978) model for high speed wind
     """
-    return old_div(friction_velocity, kappa * math.log(old_div(height, roughness_length)))
+    return friction_velocity / kappa * math.log(height / roughness_length)
 
 
 def wind_speed_array(height_array, friction_velocity, roughness_length, kappa=0.41):
@@ -95,7 +95,7 @@ def vel_to_vxy_dir(vel):
     Direction of wind in xy plane
     """
     vel_mag = math.sqrt(vel[0] * vel[0] + vel[1] * vel[1])
-    vxy_dir = math.asin(old_div(vel[0], vel_mag))
+    vxy_dir = math.asin(vel[0] / vel_mag)
     vxy_dir = 360.0 - math.degrees(vxy_dir)
     return vxy_dir
 
@@ -105,6 +105,6 @@ def vel_to_upflow(vel):
     Wind upflow angle
     """
     vel_mag = math.sqrt(vel[0] * vel[0] + vel[1] * vel[1] + vel[2] * vel[2])
-    upflow_angle = math.asin(old_div(vel[2], vel_mag))
+    upflow_angle = math.asin(vel[2] / vel_mag)
     upflow_angle = math.degrees(upflow_angle)
     return upflow_angle
