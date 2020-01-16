@@ -9,6 +9,8 @@ batch = False
 if 'BATCH_ANALYSIS' in os.environ:
     batch = True
 
+# https://matplotlib.org/tutorials/introductory/usage.html#backends
+
 from matplotlib.rcsetup import all_backends
 
 if batch:
@@ -17,7 +19,9 @@ if batch:
     else:
         matplotlib.use('agg')
 else:
-    if 'nbagg' in all_backends:
+    if 'ipympl' in all_backends:
+        matplotlib.use('ipympl')
+    elif 'nbagg' in all_backends:
         matplotlib.use('nbagg')
     else:
         matplotlib.use('nbAgg')
