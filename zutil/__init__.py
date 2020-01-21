@@ -504,6 +504,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
     ro = zone_default(turbine_zone_dict,'outer radius',30.0,verbose)
     rotor_swept_area = math.pi*(ro*ro - ri*ri)
     disc_normal = zone_default(turbine_zone_dict,'normal',[1.0,0.0,0.0],verbose)
+    disc_centre = zone_default(turbine_zone_dict,'centre',[0.0,0.0,0.0],verbose)
     up = zone_default(turbine_zone_dict,'up',[0.0,0.0,1.0],verbose)
     yaw = zone_default(turbine_zone_dict,'yaw',0.0,verbose)
     auto_yaw = zone_default(turbine_zone_dict,'auto yaw',False,verbose)
@@ -519,6 +520,8 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
     if not (induction or bet or simple or bet_prop):
         if MPI.COMM_WORLD.Get_rank() == 0: print('NO MODEL SPECIFIED - DEFAULT TO SIMPLE MODEL')
         simple = True
+
+    annulus_metrics = create_annulus(turbine_zone_dict)
 
     if inertia:
         dt = zone_default(turbine_zone_dict,'dt',0.1,verbose)
@@ -646,63 +649,55 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
             print('disc_normal = ' + str(disc_normal))
 
     if bet_prop:
-        dtheta = math.radians(360.0 / number_of_segments)
         annulus = []
         theta = 0.0
         total_area = 0.0
         total_thrust = 0.0
         total_torque = 0.0
         angular_induction = 0.0
+
         avindex = 0
-        for i in range(number_of_segments):
-            r = ri
-            while r < ro:
-                dr = old_div(dtheta * r, (1.0 - 0.5 * dtheta))
-                max_r = r + dr
-                if max_r > ro: dr = ro - r
-                rp = r + 0.5 * dr
-                da = dtheta * rp * dr
-                theta = (float(i) + 0.5)*dtheta
-                tilt_axis = unit_vector(np.cross(up,disc_normal))
-                rvec0 = rotate(disc_normal,tilt_axis,math.radians(90.0))
-                rvec = rotate(rvec0, disc_normal, theta)
-                ulocal = np.reshape(annulusVel,(-1,3))[avindex]
-                if rotation_direction == 'clockwise':
-                    local_omega_vec = np.cross(rvec, disc_normal)
-                else:
-                    local_omega_vec = np.cross(disc_normal, rvec)
-                v_n = -np.dot(ulocal,disc_normal)
-                v_r =  np.dot(ulocal,local_omega_vec)
-                if (abs((rp*omega)+v_r)) > 0.0:
-                    theta_rel = math.atan(v_n/((rp*omega)-v_r))
-                else:
-                    theta_rel = math.pi/2.0
-                urel = math.sqrt((rp*omega + v_r)**2 + v_n**2)
-                beta_twist = np.interp(old_div(rp,ro),np.array(blade_twist).T[0],np.array(blade_twist).T[1])
-                chord = np.interp(old_div(rp,ro),np.array(blade_chord).T[0],np.array(blade_chord).T[1])*ro
-                beta = math.radians(beta_twist)
-                alpha = beta - theta_rel
-                cl = np.interp(math.degrees(alpha),np.array(aerofoil_cl).T[0],np.array(aerofoil_cl).T[1])
-                cd = np.interp(math.degrees(alpha),np.array(aerofoil_cd).T[0],np.array(aerofoil_cd).T[1])
-                if tip_loss_correction:
-                    rstar = tip_loss_correction_r*ro
-                    if rp > rstar:
-                        tip_loss_factor = math.sqrt(1.0-((rp-rstar)/(ro-rstar))**2)
-                        cl = cl*tip_loss_factor
-                        cd = cd*tip_loss_factor
-                f_L = cl*0.5*density*urel**2*chord
-                f_D = cd*0.5*density*urel**2*chord
-                F_L = old_div(nblades,(2.0*math.pi*rp))*f_L
-                F_D = old_div(nblades,(2.0*math.pi*rp))*f_D
-                dt =  -(F_L*math.cos(theta_rel) - F_D*math.sin(theta_rel))*da
-                dq =  -(F_L*math.sin(theta_rel) + F_D*math.cos(theta_rel))*da
-                if rotation_direction == 'anticlockwise': dq = -dq
-                annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
-                total_area += da
-                total_thrust += dt
-                total_torque += math.fabs(dq*rp)
-                r = r + dr
-                avindex = avindex + 1
+        # annulus_metrics = (r, dr, i * dtheta, dtheta, disc_pt[0], disc_pt[1], disc_pt[2])
+        for am in annulus_metrics:
+            rp = am[0] + 0.5*am[1]
+            da = am[3]*rp*am[1]
+            ulocal = np.reshape(annulusVel,(-1,3))[avindex]
+            rvec = unit_vector([am[4]-disc_centre[0],am[5]-disc_centre[1],am[6]-disc_centre[2]])
+            if rotation_direction == 'clockwise':
+                local_omega_vec = np.cross(rvec, disc_normal)
+            else:
+                local_omega_vec = np.cross(disc_normal, rvec)
+            v_n = -np.dot(ulocal,disc_normal)
+            v_r =  np.dot(ulocal,local_omega_vec)
+            if (abs((rp*omega)+v_r)) > 0.0:
+                theta_rel = math.atan(v_n/((rp*omega)-v_r))
+            else:
+                theta_rel = math.pi/2.0
+            urel = math.sqrt((rp*omega - v_r)**2 + v_n**2)
+            beta_twist = np.interp(old_div(rp,ro),np.array(blade_twist).T[0],np.array(blade_twist).T[1])
+            chord = np.interp(old_div(rp,ro),np.array(blade_chord).T[0],np.array(blade_chord).T[1])*ro
+            beta = math.radians(beta_twist)
+            alpha = beta - theta_rel
+            cl = np.interp(math.degrees(alpha),np.array(aerofoil_cl).T[0],np.array(aerofoil_cl).T[1])
+            cd = np.interp(math.degrees(alpha),np.array(aerofoil_cd).T[0],np.array(aerofoil_cd).T[1])
+            if tip_loss_correction:
+                rstar = tip_loss_correction_r*ro
+                if rp > rstar:
+                    tip_loss_factor = math.sqrt(1.0-((rp-rstar)/(ro-rstar))**2)
+                    cl = cl*tip_loss_factor
+                    cd = cd*tip_loss_factor
+            f_L = cl*0.5*density*urel**2*chord
+            f_D = cd*0.5*density*urel**2*chord
+            F_L = old_div(nblades,(2.0*math.pi*rp))*f_L
+            F_D = old_div(nblades,(2.0*math.pi*rp))*f_D
+            dt =  -(F_L*math.cos(theta_rel) - F_D*math.sin(theta_rel))*da
+            dq =  -(F_L*math.sin(theta_rel) + F_D*math.cos(theta_rel))*da
+            if rotation_direction == 'anticlockwise': dq = -dq
+            annulus.append((dt, dq, am[0], am[1], am[2], am[3]))
+            total_area += da
+            total_thrust += dt
+            total_torque += math.fabs(dq*rp)
+            avindex = avindex + 1
         total_power = total_torque * omega
 
     elif bet:
