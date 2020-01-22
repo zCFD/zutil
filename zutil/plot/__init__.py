@@ -21,7 +21,8 @@ if batch:
 else:
     matplotlib.use('module://ipympl.backend_nbagg')
 
-matplotlib.rcParams['backend_fallback'] = False
+matplotlib.rcParams.update({'backend_fallback': False})
+matplotlib.rcParams.update({'figure.max_open_warning': 0})
 
 from matplotlib import pylab, mlab, pyplot
 plt = pyplot
