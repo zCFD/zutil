@@ -782,7 +782,18 @@ def create_trbx_zcfd_input(case_name='windfarm',
                                 northing - reference_point_offset * rd * wv[1],
                                 hub_z - reference_point_offset * rd * wv[2]]
 
-                        tz.write('\'reference plane\':True,\n')
+                        if 'reference_plane' in kwargs:
+                            reference_plane = kwargs.get("reference_plane")
+                            tz.write('\'reference plane\':'+str(reference_plane)+',\n')
+                        else:
+                            tz.write('\'reference plane\':True,\n')
+
+                        if 'number_of_segments' in kwargs:
+                            number_of_segments = kwargs.get("number_of_segments")
+                            tz.write('\'number of segments\':'+str(number_of_segments)+',\n')
+                        else:
+                            tz.write('\'number_of_segments\':12,\n')
+
                         tz.write('\'reference point\':[' + str(pref[0]) + ',' + str(pref[1]) + ',' + str(pref[2]) + '],\n')
                         tz.write('\'update frequency\':' + str(update_frequency) + ',\n')
                         tz.write('\'model\':' + ' \'' + model + '\',\n')
@@ -797,9 +808,15 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         tz.write('\'outer radius\':' + str(float(turbine_dict['outer radius'])) + ',\n')
                         tz.write('\'model\':\'blade element theory\',\n')
                         tz.write('\'def\':\'' + directory + name + '-' + str(wind_direction) + '.vtp\',\n')
-                        tz.write('\'verbose\':False,\n')
+                        if 'verbose' in turbine_dict:
+                            tz.write('\'verbose\': ' + str(turbine_dict['verbose']) + ',\n')
+                        else:
+                            tz.write('\'verbose\':False,\n')
                         tz.write('\'update frequency\':' + str(update_frequency) + ',\n')
-                        tz.write('\'reference plane\':True,\n')
+                        if 'reference plane' in turbine_dict:
+                            tz.write('\'reference plane\': ' + str(turbine_dict['reference plane']) + ',\n')
+                        else:
+                            tz.write('\'reference plane\':True,\n')
                         tz.write('\'centre\':[' + str(easting) + ',' + str(northing) + ',' + str(hub_z) + '],\n')
                         tz.write('\'up\':[0.0,0.0,1.0],\n')
                         if 'number of segments' in turbine_dict:
@@ -823,6 +840,14 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         tz.write('\'cut in speed\':' + str(turbine_dict['cut in speed']) + ',\n')
                         tz.write('\'cut out speed\':' + str(turbine_dict['cut out speed']) + ',\n')
                         tz.write('\'rotation direction\':\'clockwise\',\n')
+                        if 'thrust factor' in turbine_dict:
+                            tz.write('\'thrust factor\':' + str(turbine_dict['thrust factor']) + ',\n')
+                        if 'tip loss correction' in turbine_dict:
+                            tz.write('\'tip loss correction\': \'' + str(turbine_dict['tip loss correction']) + '\',\n')
+                        if 'blade pitch step' in turbine_dict:
+                            tz.write('\'blade pitch step\':' + str(turbine_dict['blade pitch step']) + ',\n')
+                        if 'blade pitch' in turbine_dict:
+                            tz.write('\'blade pitch\':' + str(turbine_dict['blade pitch']) + ',\n')
                         tz.write('\'aerofoil profile\':' + str(turbine_dict['aerofoil profile']) + ',\n')
                         tz.write('\'aerofoil cl\':' + str(turbine_dict['aerofoil cl']) + ',\n')
                         tz.write('\'aerofoil cd\':' + str(turbine_dict['aerofoil cd']) + ',\n')
