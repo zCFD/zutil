@@ -512,6 +512,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
     inertia = zone_default(turbine_zone_dict,'inertia',False,verbose)
     model = zone_default(turbine_zone_dict,'model','simple',verbose)
     status = zone_default(turbine_zone_dict,'status','on',verbose)
+    use_glauert_power = zone_default(turbine_zone_dict,'use glauert power',False,verbose)
     if MPI.COMM_WORLD.Get_rank() == 0 and verbose: print(model)
     induction = 'induction' in model
     bet = 'blade element theory' in model
@@ -545,6 +546,8 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
             tip_loss_correction_model = zone_default(turbine_zone_dict,'tip loss correction','none',verbose)
             tip_loss_correction_r = zone_default(turbine_zone_dict,'tip loss correction radius',0.0,verbose)
     elif bet:
+        global bet_kernel_calls
+        bet_kernel_calls = 0
         temp = np.reshape(annulusVel,(-1,3)).T
         u_ref = math.sqrt(np.mean(temp[0])**2 + np.mean(temp[1])**2 + np.mean(temp[2])**2)
         nblades = zone_default(turbine_zone_dict,'number of blades',3,verbose)
@@ -553,6 +556,8 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         blade_chord = zone_default(turbine_zone_dict,'blade chord',[[0.0,0.1],[1.0,0.1]],verbose)
         blade_twist = zone_default(turbine_zone_dict,'blade twist',[[0.0,25.0],[1.0,0.0]],verbose) # degrees
         blade_pitch_range = zone_default(turbine_zone_dict,'blade pitch range',[-10.0,10.0],verbose) # degrees
+        blade_pitch_step = zone_default(turbine_zone_dict,'blade pitch step',1.0,verbose) # degrees
+        blade_pitch = zone_default(turbine_zone_dict,'blade pitch',0.0,verbose) # degrees
         blade_pitch_tol = zone_default(turbine_zone_dict,'blade pitch tol',0.01,verbose) # degrees
         dt = zone_default(turbine_zone_dict,'dt',0.1,verbose) # seconds
         rated_power = zone_default(turbine_zone_dict,'rated power',2.3e6,verbose) # Watts
@@ -576,6 +581,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
             induction = False
     else:
         power_model = zone_default(turbine_zone_dict,'power model',None,False)
+        if power_model == 'glauert': use_glauert_power = True
         u_ref = math.sqrt(v0*v0 + v1*v1 + v2*v2)
         if 'thrust coefficient curve' in turbine_zone_dict:
             tc = np.interp(u_ref,
@@ -604,16 +610,21 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         u_infty = (3.0/2.0)*u_ref # Assuming 1D momentum theory and the Betz limit
 
     betz_power = 0.5*density*u_infty**3*rotor_swept_area*(16.0/27.0)
-    if False:
-        b_vals = np.arange(0.3334,0.5,0.0001)
-        peters_lr_vals = []
-        for b in b_vals:
-            peters_lr_vals.append(old_div(math.sqrt(1.0+b)*(1.0-2.0*b),math.sqrt(3.0*b-1.0)))
-        b0 = np.interp(ts,peters_lr_vals[::-1],b_vals[::-1])
-        y = (3.0*b0-1.0)
-        glauert_power = 0.5*density*u_infty**3*rotor_swept_area*glauert_peters(y)
-    else:
-        glauert_power = betz_power
+    if use_glauert_power:
+        if 'glauert power curve' not in turbine_zone_dict:
+            gp_curve = []
+            ts_vals = np.arange(0.0,20.0,0.1)
+            b_vals = np.arange(0.3334,0.5,0.0001)
+            peters_lr_vals = []
+            for b in b_vals:
+                peters_lr_vals.append(old_div(math.sqrt(1.0+b)*(1.0-2.0*b),math.sqrt(3.0*b-1.0)))
+            for ts_val in ts_vals:
+                b0 = np.interp(ts,peters_lr_vals[::-1],b_vals[::-1])
+                y = (3.0*b0-1.0)
+                gp = 0.5*density*u_infty**3*rotor_swept_area*glauert_peters(y)
+                gp.append([ts_val,gp])
+            turbine_zone_dict['glauert power curve'] = gp
+        glauert_power = np.interp(ts,turbine_zone_dict['glauert power curve'].T[0],turbine_zone_dict['glauert power curve'].T[1])
 
     if verbose and (MPI.COMM_WORLD.Get_rank() == 0):
         print('tip speed ratio = ' + str(ts))
@@ -701,86 +712,93 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         total_power = total_torque * omega
 
     elif bet:
+        global bet_kernel_calls
+        bet_kernel_calls = 0
+
+        # pre-populate the beta_twist and chord values
+        for i in range(len(annulus_metrics)):
+            rp = annulus_metrics[i][0] + 0.5*annulus_metrics[i][1]
+            beta_twist = np.interp((rp/ro),np.array(blade_twist).T[0],np.array(blade_twist).T[1])
+            chord = np.interp((rp/ro),np.array(blade_chord).T[0],np.array(blade_chord).T[1])*ro
+            annulus_metrics[i] = annulus_metrics[i] + (beta_twist, chord)
+
+        annulus = len(annulus_metrics)*[(0.0,0.0,0.0,0.0,0.0,0.0)]
+
         def bet_kernel(beta_pitch):
-            dtheta = math.radians(360.0 / number_of_segments)
-            annulus = []
-            theta = 0.0
+            global bet_kernel_calls
+            bet_kernel_calls = bet_kernel_calls + 1
             total_area = 0.0
             total_thrust = 0.0
             total_torque = 0.0
             angular_induction = 0.0
             avindex = 0
             alpha_positive = True # check whether any segments are at negative angle of attack.
-            for i in range(number_of_segments):
-                r = ri
-                while r < ro:
-                    dr = old_div(dtheta * r, (1.0 - 0.5 * dtheta))
-                    max_r = r + dr
-                    if max_r > ro: dr = ro - r
-                    rp = r + 0.5 * dr
-                    da = dtheta * rp * dr
-                    theta = (float(i) + 0.5)*dtheta
-                    tilt_axis = np.cross(up,disc_normal)
-                    rvec0 = rotate(up,tilt_axis,math.radians(tilt))
-                    rvec = rotate(rvec0, disc_normal, theta)
-                    ulocal = np.reshape(annulusVel,(-1,3))[avindex]
-                    if rotation_direction == 'clockwise':
-                        local_omega_vec = np.cross(rvec, disc_normal)
+            # annulus_metrics = (r, dr, i * dtheta, dtheta, disc_pt[0], disc_pt[1], disc_pt[2], beta_twist, chord)
+            for am in annulus_metrics:
+                rp = am[0] + 0.5*am[1]
+                da = am[3]*rp*am[1]
+                tilt_axis = np.cross(up,disc_normal)
+                rvec0 = rotate(up,tilt_axis,math.radians(tilt))
+                rvec = unit_vector([am[4]-disc_centre[0],am[5]-disc_centre[1],am[6]-disc_centre[2]])
+                ulocal = np.reshape(annulusVel,(-1,3))[avindex]
+                if rotation_direction == 'clockwise':
+                    local_omega_vec = np.cross(rvec, disc_normal)
+                else:
+                    local_omega_vec = np.cross(disc_normal, rvec)
+                omega_air = np.dot(local_omega_vec, ulocal)/rp
+                omega_rel = omega - omega_air
+                u_ref_local = -np.dot(ulocal,disc_normal)
+                urel = math.sqrt((rp*omega_rel)**2 + u_ref_local**2)
+                if (rp*omega_rel) > 0.0:
+                    theta_rel = math.atan(old_div(u_ref_local,(rp*omega_rel)))
+                else:
+                    theta_rel = math.pi/2.0
+                beta_twist = am[7]
+                chord = am[8]
+                beta = math.radians(beta_pitch + beta_twist)
+                alpha = theta_rel - beta
+                if (alpha < 0.0): alpha_positive = False
+                cl = np.interp(math.degrees(alpha),np.array(aerofoil_cl).T[0],np.array(aerofoil_cl).T[1])
+                if tip_loss_correction:
+                    if tip_loss_correction_model == 'elliptic':
+                        tlc = math.sqrt(1.0-(rp/ro)**2)
+                    elif tip_loss_correction_model == 'acos-fit':
+                        tlc = (2.0/math.pi)*math.acos(math.exp(-63.0*(1.0-(rp/ro)**2)))
+                    elif tip_loss_correction_model == 'acos shift-fit':
+                        tlc = (2.0/math.pi)*math.acos(math.exp(-48.0*(1.0-(rp/ro)**2)-0.5))
+                    elif tip_loss_correction_model == 'f-fit':
+                        tlc = 1.0-2.5*((1.0-(rp/ro)**2)**0.39)/((2.0-(rp/ro)**2)**64)
                     else:
-                        local_omega_vec = np.cross(disc_normal, rvec)
-                    omega_air = np.dot(local_omega_vec, ulocal)/rp
-                    omega_rel = omega - omega_air
-                    u_ref_local = -np.dot(ulocal,disc_normal)
-                    urel = math.sqrt((rp*omega_rel)**2 + u_ref_local**2)
-                    if (rp*omega_rel) > 0.0:
-                        theta_rel = math.atan(old_div(u_ref_local,(rp*omega_rel)))
-                    else:
-                        theta_rel = math.pi/2.0
-                    beta_twist = np.interp(old_div(rp,ro),np.array(blade_twist).T[0],np.array(blade_twist).T[1])
-                    chord = np.interp(old_div(rp,ro),np.array(blade_chord).T[0],np.array(blade_chord).T[1])*ro
-                    beta = math.radians(beta_pitch + beta_twist)
-                    alpha = theta_rel - beta
-                    if (alpha < 0.0): alpha_positive = False
-                    cl = np.interp(math.degrees(alpha),np.array(aerofoil_cl).T[0],np.array(aerofoil_cl).T[1])
-                    if tip_loss_correction:
-                        if tip_loss_correction_model == 'elliptic':
-                            tlc = math.sqrt(1.0-(rp/ro)**2)
-                        elif tip_loss_correction_model == 'acos-fit':
-                            tlc = (2.0/math.pi)*math.acos(math.exp(-63.0*(1.0-(rp/ro)**2)))
-                        elif tip_loss_correction_model == 'acos shift-fit':
-                            tlc = (2.0/math.pi)*math.acos(math.exp(-48.0*(1.0-(rp/ro)**2)-0.5))
-                        elif tip_loss_correction_model == 'f-fit':
-                            tlc = 1.0-2.5*((1.0-(rp/ro)**2)**0.39)/((2.0-(rp/ro)**2)**64)
-                        else:
-                            tlc = 1.0
-                        cl = cl*tlc # only apply to lift, not drag.
-                    cd = np.interp(math.degrees(alpha),np.array(aerofoil_cd).T[0],np.array(aerofoil_cd).T[1])
-                    f_L = cl*0.5*density*urel**2*chord
-                    f_D = cd*0.5*density*urel**2*chord
-                    F_L = old_div(nblades,(2.0*math.pi*rp))*f_L
-                    F_D = old_div(nblades,(2.0*math.pi*rp))*f_D
-                    dt = ((F_L*math.cos(theta_rel) + F_D*math.sin(theta_rel))*da)*thrust_factor
-                    dq = -(F_L*math.sin(theta_rel) - F_D*math.cos(theta_rel))*da
-                    if rotation_direction == 'clockwise': dq = -dq
-                    annulus.append((dt, dq, r, dr, i * dtheta, dtheta))
-                    total_area += da
-                    total_thrust += dt
-                    total_torque += math.fabs(dq*rp)
-                    angular_induction += omega_air*da
-                    r = r + dr
-                    avindex = avindex + 1
+                        tlc = 1.0
+                    cl = cl*tlc # only apply to lift, not drag.
+                cd = np.interp(math.degrees(alpha),np.array(aerofoil_cd).T[0],np.array(aerofoil_cd).T[1])
+                f_L = cl*0.5*density*urel**2*chord
+                f_D = cd*0.5*density*urel**2*chord
+                F_L = old_div(nblades,(2.0*math.pi*rp))*f_L
+                F_D = old_div(nblades,(2.0*math.pi*rp))*f_D
+                dt = ((F_L*math.cos(theta_rel) + F_D*math.sin(theta_rel))*da)*thrust_factor
+                dq = -(F_L*math.sin(theta_rel) - F_D*math.cos(theta_rel))*da
+                if rotation_direction == 'clockwise': dq = -dq
+                annulus[avindex] = (dt, dq, am[0], am[1], am[2], am[3])
+                total_area += da
+                total_thrust += dt
+                total_torque += math.fabs(dq*rp)
+                angular_induction += omega_air*da
+                avindex = avindex + 1
             if not alpha_positive:
                 if MPI.COMM_WORLD.Get_rank() == 0 and verbose: print('WARNING - negative angle of attack ')
             angular_induction = angular_induction/total_area
             return total_torque, total_area, total_thrust, angular_induction, annulus
 
-        def turbine_controller(omega, rated_power, tip_speed_limit, damage_ti, damage_speed, status, u_ref, cut_in_speed, cut_out_speed):
+        def turbine_controller(omega, rated_power, tip_speed_limit, damage_ti, damage_speed, status, u_ref, cut_in_speed, cut_out_speed, blade_pitch, blade_pitch_step):
             if status == 'off': omega = 0.0
             if (u_ref < cut_in_speed) or (u_ref > cut_out_speed): omega = 0.0
             # Make sure we are not exceeding the blade tip speed limit
             omega = min(omega,tip_speed_limit/ro)*(1.0-friction_loss)
             # work out whether we are feathering the blades to shed power:
-            blade_pitch_opt = np.min(gss(bet_kernel, blade_pitch_range[0], blade_pitch_range[1], blade_pitch_tol))
+            blade_pitch_low = max(blade_pitch - blade_pitch_step,blade_pitch_range[0])
+            blade_pitch_high = min(blade_pitch + blade_pitch_step, blade_pitch_range[1])
+            blade_pitch_opt = np.min(gss(bet_kernel, blade_pitch_low, blade_pitch_high, blade_pitch_tol))
             if (MPI.COMM_WORLD.Get_rank() == 0 and verbose): print('Blade pitch opt = ' + str(blade_pitch_opt))
             maximum_torque = bet_kernel(blade_pitch_opt)[0]
             if (MPI.COMM_WORLD.Get_rank() == 0 and verbose): print('Maximum torque = ' + str(maximum_torque))
@@ -788,11 +806,14 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                 if (MPI.COMM_WORLD.Get_rank() == 0 and verbose): print('Feathering to reduce power below rated power')
                 # Construct a power curve against blade pitch for the current rate of rotation
                 blade_pitch_curve = []
-                for b in np.arange(blade_pitch_range[0],blade_pitch_opt,0.2):
+                for b in np.arange(blade_pitch_low,blade_pitch_opt,blade_pitch_tol):
                     blade_pitch_curve.append([b,omega*bet_kernel(b)[0]])
                 if ((MPI.COMM_WORLD.Get_rank() == 0) and verbose): print('Points on blade pitch curve : ' + str(len(blade_pitch_curve)))
-                # Look up the blade pitch that recovers the rated power
-                blade_pitch = np.interp(rated_power, np.array(blade_pitch_curve).T[1], np.array(blade_pitch_curve).T[0])
+                if len(blade_pitch_curve) > 1:
+                    # Look up the blade pitch that recovers the rated power
+                    blade_pitch = np.interp(rated_power, np.array(blade_pitch_curve).T[1], np.array(blade_pitch_curve).T[0])
+                else:
+                    blade_pitch = blade_pitch_low
                 if (MPI.COMM_WORLD.Get_rank() == 0) and verbose: print('Rated power blade pitch =  : ' + str(blade_pitch))
                 total_torque, total_area, total_thrust, angular_induction, annulus = bet_kernel(blade_pitch)
                 torque_blades = 0.0
@@ -840,12 +861,13 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
             return blade_pitch, omega, torque_blades, torque_power, total_torque, total_area, total_thrust, angular_induction, annulus
 
         blade_pitch, omega, torque_blades, torque_power, total_torque, total_area, total_thrust, angular_induction, annulus = \
-                turbine_controller(omega, rated_power, tip_speed_limit, damage_ti, damage_speed, status, u_ref, cut_in_speed, cut_out_speed)
+                turbine_controller(omega, rated_power, tip_speed_limit, damage_ti, damage_speed, status, u_ref, cut_in_speed, cut_out_speed, blade_pitch, blade_pitch_step)
 
         turbine_power = torque_power*math.fabs(omega)
         total_power = total_torque * omega
 
         turbine_zone_dict['omega'] = omega
+        turbine_zone_dict['blade pitch'] = blade_pitch
         turbine_zone_dict['yaw'] = yaw
 
         if MPI.COMM_WORLD.Get_rank() == 0:
@@ -862,13 +884,10 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
                 print('torque power = ' + str(torque_power) + ' Joules/rad')
                 print('torque blades = ' + str(torque_blades) + ' Joules/rad')
                 print('angular induction = ' + str(100.0*angular_induction/omega) + '%')
+                print('bet kernel calls = ' + str(bet_kernel_calls))
 
         # TODO - add turbulence source in wake of turbine.
-        # TODO - damp out auto yaw control, apply say 10% of the difference
         # TODO - add restart capability (read data from CSV report file)
-        # TODO - add options to switch non-essential functions off to speed up execution
-        # TODO - add thrust coefficient to bet output to compare with manufacturers spec
-        # TODO - refactor the turbine controller code
 
     else:
         if power_model == 'betz':
@@ -947,7 +966,8 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
             print('total torque = ' + str(total_torque) + ' Joules/rad')
             if not bet_prop:
                 print('% of Betz limit power ' + str(old_div(100.0*total_power,betz_power)) + '%')
-                print('% of Glauert optimal power ' + str(old_div(100.0*total_power,glauert_power)) + '%')
+                if use_glauert_power:
+                    print('% of Glauert optimal power ' + str(old_div(100.0*total_power,glauert_power)) + '%')
     return annulus
 
 def project_to_plane(pt, plane_point, plane_normal):
