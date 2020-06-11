@@ -782,17 +782,12 @@ def create_trbx_zcfd_input(case_name='windfarm',
                                 northing - reference_point_offset * rd * wv[1],
                                 hub_z - reference_point_offset * rd * wv[2]]
 
-                        if 'reference_plane' in kwargs:
-                            reference_plane = kwargs.get("reference_plane")
-                            tz.write('\'reference plane\':'+str(reference_plane)+',\n')
-                        else:
-                            tz.write('\'reference plane\':True,\n')
+                        reference_plane = kwargs.get("reference_plane", True)
+                        tz.write('\'reference plane\':'+str(reference_plane)+',\n')
+      ```
 
-                        if 'number_of_segments' in kwargs:
-                            number_of_segments = kwargs.get("number_of_segments")
-                            tz.write('\'number of segments\':'+str(number_of_segments)+',\n')
-                        else:
-                            tz.write('\'number_of_segments\':12,\n')
+                        number_of_segments = kwargs.get("number_of_segments", 12)
+                        tz.write('\'number of segments\':'+str(number_of_segments)+',\n')
 
                         tz.write('\'reference point\':[' + str(pref[0]) + ',' + str(pref[1]) + ',' + str(pref[2]) + '],\n')
                         tz.write('\'update frequency\':' + str(update_frequency) + ',\n')
@@ -808,15 +803,9 @@ def create_trbx_zcfd_input(case_name='windfarm',
                         tz.write('\'outer radius\':' + str(float(turbine_dict['outer radius'])) + ',\n')
                         tz.write('\'model\':\'blade element theory\',\n')
                         tz.write('\'def\':\'' + directory + name + '-' + str(wind_direction) + '.vtp\',\n')
-                        if 'verbose' in turbine_dict:
-                            tz.write('\'verbose\': ' + str(turbine_dict['verbose']) + ',\n')
-                        else:
-                            tz.write('\'verbose\':False,\n')
+                        tz.write('\'verbose\': ' + str(turbine_dict.get('verbose',False)) + ',\n')
                         tz.write('\'update frequency\':' + str(update_frequency) + ',\n')
-                        if 'reference plane' in turbine_dict:
-                            tz.write('\'reference plane\': ' + str(turbine_dict['reference plane']) + ',\n')
-                        else:
-                            tz.write('\'reference plane\':True,\n')
+                        tz.write('\'reference plane\': ' + str(turbine_dict.get('reference plane', True)) + ',\n')
                         tz.write('\'centre\':[' + str(easting) + ',' + str(northing) + ',' + str(hub_z) + '],\n')
                         tz.write('\'up\':[0.0,0.0,1.0],\n')
                         if 'number of segments' in turbine_dict:
