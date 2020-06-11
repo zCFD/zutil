@@ -523,6 +523,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         simple = True
 
     annulus_metrics = create_annulus(turbine_zone_dict)
+    global bet_kernel_calls
 
     if inertia:
         dt = zone_default(turbine_zone_dict,'dt',0.1,verbose)
@@ -546,7 +547,6 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
             tip_loss_correction_model = zone_default(turbine_zone_dict,'tip loss correction','none',verbose)
             tip_loss_correction_r = zone_default(turbine_zone_dict,'tip loss correction radius',0.0,verbose)
     elif bet:
-        global bet_kernel_calls
         bet_kernel_calls = 0
         temp = np.reshape(annulusVel,(-1,3)).T
         u_ref = math.sqrt(np.mean(temp[0])**2 + np.mean(temp[1])**2 + np.mean(temp[2])**2)
@@ -712,7 +712,6 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         total_power = total_torque * omega
 
     elif bet:
-        global bet_kernel_calls
         bet_kernel_calls = 0
 
         # pre-populate the beta_twist and chord values
@@ -725,7 +724,6 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         annulus = len(annulus_metrics)*[(0.0,0.0,0.0,0.0,0.0,0.0)]
 
         def bet_kernel(beta_pitch):
-            global bet_kernel_calls
             bet_kernel_calls = bet_kernel_calls + 1
             total_area = 0.0
             total_thrust = 0.0
