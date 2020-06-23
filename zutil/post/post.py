@@ -961,8 +961,9 @@ def get_case_parameters_str(case_name, **kwargs):
 
 def get_case_parameters(case_name, **kwargs):
     case_file_str = get_case_parameters_str(case_name, **kwargs)
-    exec(case_file_str)
-    return parameters
+    namespace = {}
+    exec(case_file_str, namespace)
+    return namespace['parameters']
 
 
 def get_status_dict(case_name, **kwargs):
