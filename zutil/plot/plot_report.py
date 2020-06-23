@@ -186,7 +186,7 @@ class Report(object):
                     ax = fig.gca()
                     y = h
                     self.data.plot(x='Cycle', y=y, ax=ax, legend=False)
-                    rolling.plot(x=self.data['Cycle'], y=y, ax=ax, legend=0)
+                    rolling.plot(x='Cycle', y=y, ax=ax, legend=0)
                     last_val = self.data[h].tail(1).get_values()
                     # $\downarrow$ $\uparrow$ $\leftrightarrow$
                     rolling_grad = rolling[h].tail(2).get_values()[0] - rolling[h].tail(2).get_values()[1]
@@ -206,7 +206,7 @@ class Report(object):
     def plot_forces(self, mean=100):
 
         # Need to disable autoscroll
-        autoscroll(-1)
+        # autoscroll(-1)
 
         self.rolling_avg = mean
 
