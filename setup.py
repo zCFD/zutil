@@ -13,7 +13,7 @@ classes = """
 classifiers = [s.strip() for s in classes.split('\n') if s]
 
 setup(name="zutil",
-      version='1.0.0',
+      version='1.0.2',
       description="Utilities used for generating zCFD control dictionaries",
       author="Zenotech",
       author_email="support@zenotech.com",
