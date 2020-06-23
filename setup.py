@@ -32,7 +32,8 @@ setup(name="zutil",
           'matplotlib',
           'numpy',
           'pandas',
-          'PyYAML'
+          'PyYAML',
+	  'dill'
       ],
       extras_require={
           "mpi": ["mpi4py"]
