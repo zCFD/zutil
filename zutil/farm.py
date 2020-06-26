@@ -784,7 +784,6 @@ def create_trbx_zcfd_input(case_name='windfarm',
 
                         reference_plane = kwargs.get("reference_plane", True)
                         tz.write('\'reference plane\':'+str(reference_plane)+',\n')
-      ```
 
                         number_of_segments = kwargs.get("number_of_segments", 12)
                         tz.write('\'number of segments\':'+str(number_of_segments)+',\n')
