@@ -724,6 +724,7 @@ def create_turbine_segments(turbine_zone_dict, v0, v1, v2, density, turbine_name
         annulus = len(annulus_metrics)*[(0.0,0.0,0.0,0.0,0.0,0.0)]
 
         def bet_kernel(beta_pitch):
+            global bet_kernel_calls
             bet_kernel_calls = bet_kernel_calls + 1
             total_area = 0.0
             total_thrust = 0.0
