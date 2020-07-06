@@ -277,7 +277,7 @@ def get_span(wall):
     """
     Calculator1 = Calculator(Input=wall)
 
-    Calculator1.AttributeMode = 'Point Data'
+    Calculator1.AttributeType = 'Point Data'
     Calculator1.Function = 'coords.jHat'
     Calculator1.ResultArrayName = 'ypos'
     Calculator1.UpdatePipeline()
@@ -323,7 +323,7 @@ def get_chord(slice, rotate_geometry=[0.0, 0.0, 0.0]):
 
     Calculator1 = Calculator(Input=transform)
 
-    Calculator1.AttributeMode = 'Point Data'
+    Calculator1.AttributeType = 'Point Data'
     Calculator1.Function = 'coords.iHat'
     Calculator1.ResultArrayName = 'xpos'
     Calculator1.UpdatePipeline()
@@ -356,7 +356,7 @@ def get_chord_spanwise(slice):
 
     Calculator1 = Calculator(Input=slice)
 
-    Calculator1.AttributeMode = 'Point Data'
+    Calculator1.AttributeType = 'Point Data'
     Calculator1.Function = 'coords.jHat'
     Calculator1.ResultArrayName = 'ypos'
     Calculator1.UpdatePipeline()
@@ -533,7 +533,7 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
         filter_zones = kwargs['filter']
         calc_str = ''.join('(zone={:d})|'.format(i) for i in filter_zones)
         filter_data = Calculator(Input=point_data)
-        filter_data.AttributeMode = 'Cell Data'
+        filter_data.AttributeType = 'Cell Data'
         filter_data.Function = ('if (' + calc_str[:-1] + ', 1, 0)')
         filter_data.ResultArrayName = 'zonefilter'
         filter_data.UpdatePipeline()
@@ -588,7 +588,7 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
         pass
     else:
         chord_calc = Calculator(Input=transform)
-        chord_calc.AttributeMode = 'Point Data'
+        chord_calc.AttributeType = 'Point Data'
         chord_calc.Function = ('(coords.iHat - ' + str(offset[0]) + ')/' +
                                str(offset[1] - offset[0]))
         chord_calc.ResultArrayName = 'chord'
@@ -695,7 +695,7 @@ def cp_profile_span(surface, slice_normal, slice_origin, **kwargs):
     # make the
     chord_calc = Calculator(Input=slice)
 
-    chord_calc.AttributeMode = 'Point Data'
+    chord_calc.AttributeType = 'Point Data'
     chord_calc.Function = ('(coords.jHat - ' + str(offset[0]) + ')/' +
                            str(offset[1] - offset[0]))
     chord_calc.ResultArrayName = 'chord'
@@ -755,14 +755,14 @@ def cf_profile(surface, slice_normal, slice_origin, **kwargs):
 
     chord_calc = Calculator(Input=slice)
 
-    chord_calc.AttributeMode = 'Point Data'
+    chord_calc.AttributeType = 'Point Data'
     chord_calc.Function = ('(coords.iHat - ' + str(offset[0]) + ')/' +
                            str(offset[1] - offset[0]))
     chord_calc.ResultArrayName = 'chord'
 
     cf_calc = Calculator(Input=chord_calc)
 
-    cf_calc.AttributeMode = 'Point Data'
+    cf_calc.AttributeType = 'Point Data'
     cf_calc.Function = 'mag(cf)'
     cf_calc.ResultArrayName = 'cfmag'
 
