@@ -476,13 +476,10 @@ def cp_profile_wall_from_file(file_root, slice_normal,
     clean.UpdatePipeline()
     Delete(wall)
     del wall
-    merged = MergeBlocks(Input=clean)
-    merged.UpdatePipeline()
+    profile = cp_profile(clean, slice_normal, slice_origin, **kwargs)
     Delete(clean)
     del clean
-    profile = cp_profile(merged, slice_normal, slice_origin, **kwargs)
-    Delete(merged)
-    del merged
+
     return profile
 
 
@@ -494,13 +491,10 @@ def cp_profile_wall_from_file_span(file_root, slice_normal,
     clean.UpdatePipeline()
     Delete(wall)
     del wall
-    merged = MergeBlocks(Input=clean)
-    merged.UpdatePipeline()
+    profile = cp_profile_span(clean, slice_normal, slice_origin, **kwargs)
     Delete(clean)
     del clean
-    profile = cp_profile_span(merged, slice_normal, slice_origin, **kwargs)
-    Delete(merged)
-    del merged
+
     return profile
 
 
@@ -727,9 +721,8 @@ def cf_profile_wall_from_file(file_root, slice_normal,
     wall = PVDReader(FileName=file_root + '_wall.pvd')
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
-    merged = MergeBlocks(Input=clean)
-    merged.UpdatePipeline()
-    return cf_profile(merged, slice_normal, slice_origin, **kwargs)
+
+    return cf_profile(clean, slice_normal, slice_origin, **kwargs)
 
 
 def cf_profile(surface, slice_normal, slice_origin, **kwargs):
