@@ -474,11 +474,17 @@ def cp_profile_wall_from_file(file_root, slice_normal,
     wall = PVDReader(FileName=file_root + '_wall.pvd')
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
+    inp = clean
+    if wall.IsA("vtkMultiBlockDataSet"):
+        inp = MergeBlocks(Input=clean)
+
     Delete(wall)
     del wall
-    profile = cp_profile(clean, slice_normal, slice_origin, **kwargs)
+    profile = cp_profile(inp, slice_normal, slice_origin, **kwargs)
     Delete(clean)
     del clean
+    Delete(inp)
+    del(inp)
 
     return profile
 
@@ -489,11 +495,17 @@ def cp_profile_wall_from_file_span(file_root, slice_normal,
     wall = PVDReader(FileName=file_root + '_wall.pvd')
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
+    inp = clean
+    if wall.IsA("vtkMultiBlockDataSet"):
+        inp = MergeBlocks(Input=clean)
+
     Delete(wall)
     del wall
-    profile = cp_profile_span(clean, slice_normal, slice_origin, **kwargs)
+    profile = cp_profile_span(inp, slice_normal, slice_origin, **kwargs)
     Delete(clean)
     del clean
+    Delete(inp)
+    del(inp)
 
     return profile
 
@@ -721,8 +733,19 @@ def cf_profile_wall_from_file(file_root, slice_normal,
     wall = PVDReader(FileName=file_root + '_wall.pvd')
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
+    inp = clean
+    if wall.IsA("vtkMultiBlockDataSet"):
+        inp = MergeBlocks(Input=clean)
 
-    return cf_profile(clean, slice_normal, slice_origin, **kwargs)
+    Delete(wall)
+    del wall
+    profile = cf_profile(inp, slice_normal, slice_origin, **kwargs)
+    Delete(clean)
+    del clean
+    Delete(inp)
+    del(inp)
+
+    return profile
 
 
 def cf_profile(surface, slice_normal, slice_origin, **kwargs):
