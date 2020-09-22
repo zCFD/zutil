@@ -3,13 +3,22 @@
 """
 
 
+from IPython.display import HTML, Javascript, display
+import uuid
+import csv
+from zutil import analysis
+import time
+import math
+from zutil import mag
+import json
+from zutil import rotate_vector
+from paraview.simple import *
+from builtins import object
+from past.utils import old_div
+from builtins import range
+from builtins import str
 from future import standard_library
 standard_library.install_aliases()
-from builtins import str
-from builtins import range
-from past.utils import old_div
-from builtins import object
-from paraview.simple import *
 # from paraview.vtk.util import numpy_support
 try:
     from paraview.vtk.dataset_adapter import numpyTovtkDataArray
@@ -27,15 +36,6 @@ except:
     from paraview.vtk.numpy_interface.dataset_adapter import DataSet
     from paraview.vtk.numpy_interface.dataset_adapter import CompositeDataSet
     from paraview.vtk.numpy_interface.dataset_adapter import PointSet
-
-
-from zutil import rotate_vector
-import json
-from zutil import mag
-import math
-import time
-
-from zutil import analysis
 
 
 def sum_and_zone_filter_array(input, array_name, ignore_zone, filter=None):
@@ -403,7 +403,8 @@ def get_monitor_data(file, monitor_name, var_name):
         index = names.index(str(monitor_name) + "_" + str(var_name))
         return (data[names[0]], data[names[index]])
     else:
-        print('POST.PY: MONITOR POINT: ' + str(monitor_name) + "_" + str(var_name) + ' NOT FOUND')
+        print('POST.PY: MONITOR POINT: ' + str(monitor_name) +
+              "_" + str(var_name) + ' NOT FOUND')
 
 
 def residual_plot(file, pl):
@@ -475,8 +476,11 @@ def cp_profile_wall_from_file(file_root, slice_normal,
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
     inp = clean
-    if wall.IsA("vtkMultiBlockDataSet"):
+    if inp.IsA("vtkMultiBlockDataSet"):
         inp = MergeBlocks(Input=clean)
+    else:
+        Delete(inp)
+        inp = clean
 
     Delete(wall)
     del wall
@@ -496,8 +500,11 @@ def cp_profile_wall_from_file_span(file_root, slice_normal,
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
     inp = clean
-    if wall.IsA("vtkMultiBlockDataSet"):
+    if inp.IsA("vtkMultiBlockDataSet"):
         inp = MergeBlocks(Input=clean)
+    else:
+        Delete(inp)
+        inp = clean
 
     Delete(wall)
     del wall
@@ -734,8 +741,11 @@ def cf_profile_wall_from_file(file_root, slice_normal,
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
     inp = clean
-    if wall.IsA("vtkMultiBlockDataSet"):
+    if inp.IsA("vtkMultiBlockDataSet"):
         inp = MergeBlocks(Input=clean)
+    else:
+        Delete(inp)
+        inp = clean
 
     Delete(wall)
     del wall
@@ -801,9 +811,6 @@ def cf_profile(surface, slice_normal, slice_origin, **kwargs):
 
     return {'pressure force': pforce,
             'friction force': fforce}
-
-
-import csv
 
 
 def get_csv_data(filename, header=False, remote=False, delim=' '):
@@ -1018,7 +1025,8 @@ def get_status_dict(case_name, **kwargs):
                     # print status_file_str
                     return json.loads(status_file_str)
                 else:
-                    print('WARNING: ' + case_name + '_status.txt file not found')
+                    print('WARNING: ' + case_name +
+                          '_status.txt file not found')
                     return None
         except Exception as e:
             print('WARNING: ' + case_name + '_status.txt file not found')
@@ -1093,11 +1101,6 @@ def print_html_parameters(parameters):
                                    'speed': speed,
                                    'mach': mach,
                                    })
-
-
-import uuid
-import time
-from IPython.display import HTML, Javascript, display
 
 
 class ProgressBar(object):
