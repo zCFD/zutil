@@ -3,6 +3,7 @@
 """
 
 
+from tqdm import tqdm
 from IPython.display import HTML, Javascript, display
 import uuid
 import csv
@@ -1106,27 +1107,17 @@ def print_html_parameters(parameters):
 class ProgressBar(object):
 
     def __init__(self):
-        self.divid = str(uuid.uuid4())
-        self.val = 0
-        pb = HTML(
-            """
-        <div style="border: 1px solid black; width:500px">
-          <div id="%s" style="background-color:grey; width:0%%">&nbsp;</div>
-        </div>
-        """ % self.divid)
-        display(pb)
+        self.pbar = tqdm(total=100)
 
     def __iadd__(self, v):
-        self.update(self.val + v)
+        self.pbar.update(v)
         return self
 
     def complete(self):
-        self.update(100)
-        display(Javascript("$('div#%s').hide()" % (self.divid)))
+        self.pbar.close()
 
     def update(self, i):
-        self.val = i
-        display(Javascript("$('div#%s').width('%i%%')" % (self.divid, i)))
+        self.pbar.update(i)
 
 
 #remote_data = True
