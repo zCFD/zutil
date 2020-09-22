@@ -478,10 +478,8 @@ def cp_profile_wall_from_file(file_root, slice_normal,
     clean.UpdatePipeline()
     inp = servermanager.Fetch(clean)
     if inp.IsA("vtkMultiBlockDataSet"):
-        Delete(inp)
         inp = MergeBlocks(Input=clean)
     else:
-        Delete(inp)
         inp = clean
 
     Delete(wall)
@@ -503,10 +501,8 @@ def cp_profile_wall_from_file_span(file_root, slice_normal,
     clean.UpdatePipeline()
     inp = servermanager.Fetch(clean)
     if inp.IsA("vtkMultiBlockDataSet"):
-        Delete(inp)
         inp = MergeBlocks(Input=clean)
     else:
-        Delete(inp)
         inp = clean
 
     Delete(wall)
@@ -745,10 +741,8 @@ def cf_profile_wall_from_file(file_root, slice_normal,
     clean.UpdatePipeline()
     inp = servermanager.Fetch(clean)
     if inp.IsA("vtkMultiBlockDataSet"):
-        Delete(inp)
         inp = MergeBlocks(Input=clean)
     else:
-        Delete(inp)
         inp = clean
 
     Delete(wall)
