@@ -476,8 +476,9 @@ def cp_profile_wall_from_file(file_root, slice_normal,
     wall = PVDReader(FileName=file_root + '_wall.pvd')
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
-    inp = clean
+    inp = servermanager.Fetch(clean)
     if inp.IsA("vtkMultiBlockDataSet"):
+        Delete(inp)
         inp = MergeBlocks(Input=clean)
     else:
         Delete(inp)
@@ -500,8 +501,9 @@ def cp_profile_wall_from_file_span(file_root, slice_normal,
     wall = PVDReader(FileName=file_root + '_wall.pvd')
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
-    inp = clean
+    inp = servermanager.Fetch(clean)
     if inp.IsA("vtkMultiBlockDataSet"):
+        Delete(inp)
         inp = MergeBlocks(Input=clean)
     else:
         Delete(inp)
@@ -741,8 +743,9 @@ def cf_profile_wall_from_file(file_root, slice_normal,
     wall = PVDReader(FileName=file_root + '_wall.pvd')
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
-    inp = clean
+    inp = servermanager.Fetch(clean)
     if inp.IsA("vtkMultiBlockDataSet"):
+        Delete(inp)
         inp = MergeBlocks(Input=clean)
     else:
         Delete(inp)
