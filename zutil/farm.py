@@ -684,13 +684,15 @@ def create_trbx_zcfd_input(case_name='windfarm',
                     print('Model not identified (simple, induction, blade element theory)')
 
                 print('location file name = ' + location_file_name)
-                location_array = np.genfromtxt(location_file_name, dtype=None)
+                location_array = np.genfromtxt(location_file_name, delimiter=' ',dtype=('<U100',float,float))
+                print(location_array)
                 # catch the case where only one turbine location is specified
                 if (location_array.ndim < 1):
                     location_array = np.reshape(location_array, (1,))
                 for location in location_array:
                     idx += 1
-                    name = location[0]
+                    name = str(location[0])
+                    if len(name) > 99: print('WARNING: farm.py: turbine name may be truncated '+str(name))
                     easting = location[1]
                     northing = location[2]
 
