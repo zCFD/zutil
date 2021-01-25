@@ -19,6 +19,7 @@ from past.utils import old_div
 from builtins import range
 from builtins import str
 from future import standard_library
+
 standard_library.install_aliases()
 # from paraview.vtk.util import numpy_support
 try:
@@ -68,8 +69,7 @@ def sum_and_zone_filter(input, array_name, ignore_zone, filter=None):
         iter.InitTraversal()
         while not iter.IsDoneWithTraversal():
             cur_input = iter.GetCurrentDataObject()
-            v = sum_and_zone_filter_array(cur_input, array_name,
-                                          ignore_zone, filter)
+            v = sum_and_zone_filter_array(cur_input, array_name, ignore_zone, filter)
             for i in range(0, 3):
                 sum[i] += v[i]
             iter.GoToNextItem()
@@ -80,7 +80,6 @@ def sum_and_zone_filter(input, array_name, ignore_zone, filter=None):
 
 
 class GeomFilterLT(object):
-
     def __init__(self, val, idx):
         #
         self.val = val
@@ -95,7 +94,6 @@ class GeomFilterLT(object):
 
 
 class GeomFilterGT(object):
-
     def __init__(self, val, idx):
         #
         self.val = val
@@ -109,8 +107,9 @@ class GeomFilterGT(object):
             return False
 
 
-def calc_force_from_file(file_name, ignore_zone, half_model=False,
-                         filter=None, **kwargs):
+def calc_force_from_file(
+    file_name, ignore_zone, half_model=False, filter=None, **kwargs
+):
     """ Calculates the pressure and friction force
 
     This function requires that the VTK file contains three cell data arrays
@@ -133,10 +132,9 @@ def calc_force_from_file(file_name, ignore_zone, half_model=False,
     return calc_force(wall, ignore_zone, half_model, filter, kwargs)
 
 
-def calc_force_wall(file_root, ignore_zone, half_model=False,
-                    filter=None, **kwargs):
+def calc_force_wall(file_root, ignore_zone, half_model=False, filter=None, **kwargs):
 
-    wall = PVDReader(FileName=file_root + '_wall.pvd')
+    wall = PVDReader(FileName=file_root + "_wall.pvd")
     wall.UpdatePipeline()
 
     force = calc_force(wall, ignore_zone, half_model, filter, **kwargs)
@@ -145,22 +143,19 @@ def calc_force_wall(file_root, ignore_zone, half_model=False,
     return force
 
 
-def calc_force(surface_data, ignore_zone, half_model=False,
-               filter=None, **kwargs):
+def calc_force(surface_data, ignore_zone, half_model=False, filter=None, **kwargs):
 
     alpha = 0.0
-    if 'alpha' in kwargs:
-        alpha = kwargs['alpha']
+    if "alpha" in kwargs:
+        alpha = kwargs["alpha"]
     beta = 0.0
-    if 'beta' in kwargs:
-        beta = kwargs['beta']
+    if "beta" in kwargs:
+        beta = kwargs["beta"]
 
     sum_client = servermanager.Fetch(surface_data)
 
-    pforce = sum_and_zone_filter(sum_client, "pressureforce",
-                                 ignore_zone, filter)
-    fforce = sum_and_zone_filter(sum_client, "frictionforce",
-                                 ignore_zone, filter)
+    pforce = sum_and_zone_filter(sum_client, "pressureforce", ignore_zone, filter)
+    fforce = sum_and_zone_filter(sum_client, "frictionforce", ignore_zone, filter)
 
     pforce = rotate_vector(pforce, alpha, beta)
     fforce = rotate_vector(fforce, alpha, beta)
@@ -175,27 +170,28 @@ def calc_force(surface_data, ignore_zone, half_model=False,
     return pforce, fforce
 
 
-def calc_moment(surface_data, ignore_zone, half_model=False,
-                filter=None, **kwargs):
+def calc_moment(surface_data, ignore_zone, half_model=False, filter=None, **kwargs):
 
     alpha = 0.0
-    if 'alpha' in kwargs:
-        alpha = kwargs['alpha']
+    if "alpha" in kwargs:
+        alpha = kwargs["alpha"]
     beta = 0.0
-    if 'beta' in kwargs:
-        beta = kwargs['beta']
+    if "beta" in kwargs:
+        beta = kwargs["beta"]
 
-    if 'ref_pt' in kwargs:
+    if "ref_pt" in kwargs:
         sum_client = servermanager.Fetch(surface_data)
         if sum_client.GetCellData().GetArray("pressuremomentx"):
             pmoment = sum_and_zone_filter(
-                sum_client, "pressuremomentx", ignore_zone, filter)
+                sum_client, "pressuremomentx", ignore_zone, filter
+            )
             fmoment = sum_and_zone_filter(
-                sum_client, "frictionmomentx", ignore_zone, filter)
+                sum_client, "frictionmomentx", ignore_zone, filter
+            )
 
             pmoment = rotate_vector(pmoment, alpha, beta)
             fmoment = rotate_vector(fmoment, alpha, beta)
-            #fforce = rotate_vector(fforce,alpha,beta)
+            # fforce = rotate_vector(fforce,alpha,beta)
 
             if half_model:
                 # This is only valid for X-Z plane reflection
@@ -211,14 +207,12 @@ def calc_moment(surface_data, ignore_zone, half_model=False,
 
     else:
         sum_client = servermanager.Fetch(surface_data)
-        pmoment = sum_and_zone_filter(
-            sum_client, "pressuremoment", ignore_zone, filter)
-        fmoment = sum_and_zone_filter(
-            sum_client, "frictionmoment", ignore_zone, filter)
+        pmoment = sum_and_zone_filter(sum_client, "pressuremoment", ignore_zone, filter)
+        fmoment = sum_and_zone_filter(sum_client, "frictionmoment", ignore_zone, filter)
 
         pmoment = rotate_vector(pmoment, alpha, beta)
         fmoment = rotate_vector(fmoment, alpha, beta)
-        #fforce = rotate_vector(fforce,alpha,beta)
+        # fforce = rotate_vector(fforce,alpha,beta)
 
         if half_model:
             # This is only valid for X-Z plane reflection
@@ -242,8 +236,7 @@ def calc_lift_centre_of_action(force, moment, ref_point):
     ys0 = ref_point[1] + moment[0] / force[2]
 
     zs0 = ref_point[2]
-    mzs0 = moment[2] - force[1] * \
-        (xs0 - ref_point[0]) + force[0] * (ys0 - ref_point[1])
+    mzs0 = moment[2] - force[1] * (xs0 - ref_point[0]) + force[0] * (ys0 - ref_point[1])
 
     return (xs0, ys0, zs0), mzs0
 
@@ -278,9 +271,9 @@ def get_span(wall):
     """
     Calculator1 = Calculator(Input=wall)
 
-    Calculator1.AttributeType = 'Point Data'
-    Calculator1.Function = 'coords.jHat'
-    Calculator1.ResultArrayName = 'ypos'
+    Calculator1.AttributeType = "Point Data"
+    Calculator1.Function = "coords.jHat"
+    Calculator1.ResultArrayName = "ypos"
     Calculator1.UpdatePipeline()
 
     ymin = MinMax(Input=Calculator1)
@@ -324,9 +317,9 @@ def get_chord(slice, rotate_geometry=[0.0, 0.0, 0.0]):
 
     Calculator1 = Calculator(Input=transform)
 
-    Calculator1.AttributeType = 'Point Data'
-    Calculator1.Function = 'coords.iHat'
-    Calculator1.ResultArrayName = 'xpos'
+    Calculator1.AttributeType = "Point Data"
+    Calculator1.Function = "coords.iHat"
+    Calculator1.ResultArrayName = "xpos"
     Calculator1.UpdatePipeline()
 
     xmin = MinMax(Input=Calculator1)
@@ -357,9 +350,9 @@ def get_chord_spanwise(slice):
 
     Calculator1 = Calculator(Input=slice)
 
-    Calculator1.AttributeType = 'Point Data'
-    Calculator1.Function = 'coords.jHat'
-    Calculator1.ResultArrayName = 'ypos'
+    Calculator1.AttributeType = "Point Data"
+    Calculator1.Function = "coords.jHat"
+    Calculator1.ResultArrayName = "ypos"
     Calculator1.UpdatePipeline()
 
     ymin = MinMax(Input=Calculator1)
@@ -393,19 +386,24 @@ def get_monitor_data(file, monitor_name, var_name):
     monitor.MergeConsecutiveDelimiters = 1
     monitor.UseStringDelimiter = 0
     monitor.DetectNumericColumns = 1
-    monitor.FieldDelimiterCharacters = ' '
+    monitor.FieldDelimiterCharacters = " "
     monitor.UpdatePipeline()
     monitor_client = servermanager.Fetch(monitor)
     table = Table(monitor_client)
     data = table.RowData
     names = list(data.keys())
     num_var = len(names) - 2
-    if (str(monitor_name) + "_" + str(var_name) in names):
+    if str(monitor_name) + "_" + str(var_name) in names:
         index = names.index(str(monitor_name) + "_" + str(var_name))
         return (data[names[0]], data[names[index]])
     else:
-        print('POST.PY: MONITOR POINT: ' + str(monitor_name) +
-              "_" + str(var_name) + ' NOT FOUND')
+        print(
+            "POST.PY: MONITOR POINT: "
+            + str(monitor_name)
+            + "_"
+            + str(var_name)
+            + " NOT FOUND"
+        )
 
 
 def residual_plot(file, pl):
@@ -416,7 +414,7 @@ def residual_plot(file, pl):
     l2norm.MergeConsecutiveDelimiters = 1
     l2norm.UseStringDelimiter = 0
     l2norm.DetectNumericColumns = 1
-    l2norm.FieldDelimiterCharacters = ' '
+    l2norm.FieldDelimiterCharacters = " "
     l2norm.UpdatePipeline()
 
     l2norm_client = servermanager.Fetch(l2norm)
@@ -430,24 +428,23 @@ def residual_plot(file, pl):
     num_var = len(names) - 2
     num_rows = (old_div((num_var - 1), 4)) + 1
 
-    fig = pl.figure(figsize=(40, 10 * num_rows), dpi=100,
-                    facecolor='w', edgecolor='k')
+    fig = pl.figure(figsize=(40, 10 * num_rows), dpi=100, facecolor="w", edgecolor="k")
 
-    fig.suptitle(file, fontsize=40, fontweight='bold')
+    fig.suptitle(file, fontsize=40, fontweight="bold")
 
     for i in range(1, num_var + 1):
         var_name = names[i]
         ax = fig.add_subplot(num_rows, 4, i)
-        if 'rho' in var_name:
-            ax.set_yscale('log')
-            ax.set_ylabel('l2norm ' + var_name, multialignment='center')
+        if "rho" in var_name:
+            ax.set_yscale("log")
+            ax.set_ylabel("l2norm " + var_name, multialignment="center")
         else:
-            ax.set_ylabel(var_name, multialignment='center')
+            ax.set_ylabel(var_name, multialignment="center")
 
         ax.grid(True)
-        ax.set_xlabel('Cycles')
+        ax.set_xlabel("Cycles")
 
-        ax.plot(data[names[0]], data[names[i]], color='r', label=names[i])
+        ax.plot(data[names[0]], data[names[i]], color="r", label=names[i])
 
 
 def for_each(surface, func, **kwargs):
@@ -470,10 +467,9 @@ def for_each(surface, func, **kwargs):
         func(calc, pts, **kwargs)
 
 
-def cp_profile_wall_from_file(file_root, slice_normal,
-                              slice_origin, **kwargs):
+def cp_profile_wall_from_file(file_root, slice_normal, slice_origin, **kwargs):
 
-    wall = PVDReader(FileName=file_root + '_wall.pvd')
+    wall = PVDReader(FileName=file_root + "_wall.pvd")
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
     inp = servermanager.Fetch(clean)
@@ -488,15 +484,14 @@ def cp_profile_wall_from_file(file_root, slice_normal,
     Delete(clean)
     del clean
     Delete(inp)
-    del(inp)
+    del inp
 
     return profile
 
 
-def cp_profile_wall_from_file_span(file_root, slice_normal,
-                                   slice_origin, **kwargs):
+def cp_profile_wall_from_file_span(file_root, slice_normal, slice_origin, **kwargs):
 
-    wall = PVDReader(FileName=file_root + '_wall.pvd')
+    wall = PVDReader(FileName=file_root + "_wall.pvd")
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
     inp = servermanager.Fetch(clean)
@@ -511,7 +506,7 @@ def cp_profile_wall_from_file_span(file_root, slice_normal,
     Delete(clean)
     del clean
     Delete(inp)
-    del(inp)
+    del inp
 
     return profile
 
@@ -519,19 +514,19 @@ def cp_profile_wall_from_file_span(file_root, slice_normal,
 def cp_profile(surface, slice_normal, slice_origin, **kwargs):
 
     alpha = 0.0
-    if 'alpha' in kwargs:
-        alpha = kwargs['alpha']
+    if "alpha" in kwargs:
+        alpha = kwargs["alpha"]
     beta = 0.0
-    if 'beta' in kwargs:
-        beta = kwargs['beta']
+    if "beta" in kwargs:
+        beta = kwargs["beta"]
 
     time_average = False
-    if 'time_average' in kwargs:
-        time_average = kwargs['time_average']
+    if "time_average" in kwargs:
+        time_average = kwargs["time_average"]
 
     rotate_geometry = [0.0, 0.0, 0.0]
-    if 'rotate_geometry' in kwargs:
-        rotate_geometry = kwargs['rotate_geometry']
+    if "rotate_geometry" in kwargs:
+        rotate_geometry = kwargs["rotate_geometry"]
 
     clean = CleantoGrid(Input=surface)
     clean.UpdatePipeline()
@@ -541,18 +536,18 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
     Delete(clean)
     del clean
 
-    if 'filter' in kwargs:
-        filter_zones = kwargs['filter']
-        calc_str = ''.join('(zone={:d})|'.format(i) for i in filter_zones)
+    if "filter" in kwargs:
+        filter_zones = kwargs["filter"]
+        calc_str = "".join("(zone={:d})|".format(i) for i in filter_zones)
         filter_data = Calculator(Input=point_data)
-        filter_data.AttributeType = 'Cell Data'
-        filter_data.Function = ('if (' + calc_str[:-1] + ', 1, 0)')
-        filter_data.ResultArrayName = 'zonefilter'
+        filter_data.AttributeType = "Cell Data"
+        filter_data.Function = "if (" + calc_str[:-1] + ", 1, 0)"
+        filter_data.ResultArrayName = "zonefilter"
         filter_data.UpdatePipeline()
         Delete(point_data)
         del point_data
         point_data = Threshold(Input=filter_data)
-        point_data.Scalars = ['CELLS', 'zonefilter']
+        point_data.Scalars = ["CELLS", "zonefilter"]
         point_data.ThresholdRange = [1.0, 1.0]
         point_data.UpdatePipeline()
         Delete(filter_data)
@@ -596,14 +591,15 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
     transform.Transform.Rotate = rotate_geometry
     transform.UpdatePipeline()
 
-    if 'chord_func' in kwargs:
+    if "chord_func" in kwargs:
         pass
     else:
         chord_calc = Calculator(Input=transform)
-        chord_calc.AttributeType = 'Point Data'
-        chord_calc.Function = ('(coords.iHat - ' + str(offset[0]) + ')/' +
-                               str(offset[1] - offset[0]))
-        chord_calc.ResultArrayName = 'chord'
+        chord_calc.AttributeType = "Point Data"
+        chord_calc.Function = (
+            "(coords.iHat - " + str(offset[0]) + ")/" + str(offset[1] - offset[0])
+        )
+        chord_calc.ResultArrayName = "chord"
 
     # Attempt to calculate forces
     pforce = [0.0, 0.0, 0.0]
@@ -656,7 +652,7 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
         fmomentx = sum_client.GetCellData().GetArray("frictionmomentx").GetTuple(0)
         fmomentx = rotate_vector(fmomentx, alpha, beta)
 
-    if 'func' in kwargs:
+    if "func" in kwargs:
         sorted_line = PlotOnSortedLines(Input=chord_calc)
         sorted_line.UpdatePipeline()
         extract_client = servermanager.Fetch(sorted_line)
@@ -673,20 +669,22 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
     del sorted_line
     del extract_client
 
-    return {'pressure force': pforce,
-            'friction force': fforce,
-            'pressure moment': pmoment,
-            'friction moment': fmoment}
+    return {
+        "pressure force": pforce,
+        "friction force": fforce,
+        "pressure moment": pmoment,
+        "friction moment": fmoment,
+    }
 
 
 def cp_profile_span(surface, slice_normal, slice_origin, **kwargs):
 
     alpha = 0.0
-    if 'alpha' in kwargs:
-        alpha = kwargs['alpha']
+    if "alpha" in kwargs:
+        alpha = kwargs["alpha"]
     beta = 0.0
-    if 'beta' in kwargs:
-        beta = kwargs['beta']
+    if "beta" in kwargs:
+        beta = kwargs["beta"]
 
     point_data = CellDatatoPointData(Input=surface)
     point_data.PassCellData = 1
@@ -707,10 +705,11 @@ def cp_profile_span(surface, slice_normal, slice_origin, **kwargs):
     # make the
     chord_calc = Calculator(Input=slice)
 
-    chord_calc.AttributeType = 'Point Data'
-    chord_calc.Function = ('(coords.jHat - ' + str(offset[0]) + ')/' +
-                           str(offset[1] - offset[0]))
-    chord_calc.ResultArrayName = 'chord'
+    chord_calc.AttributeType = "Point Data"
+    chord_calc.Function = (
+        "(coords.jHat - " + str(offset[0]) + ")/" + str(offset[1] - offset[0])
+    )
+    chord_calc.ResultArrayName = "chord"
 
     sum = MinMax(Input=slice)
     sum.Operation = "SUM"
@@ -723,20 +722,18 @@ def cp_profile_span(surface, slice_normal, slice_origin, **kwargs):
     pforce = rotate_vector(pforce, alpha, beta)
     fforce = rotate_vector(fforce, alpha, beta)
 
-    if 'func' in kwargs:
+    if "func" in kwargs:
         sorted_line = PlotOnSortedLines(Input=chord_calc)
         sorted_line.UpdatePipeline()
         extract_client = servermanager.Fetch(sorted_line)
         for_each(extract_client, **kwargs)
 
-    return {'pressure force': pforce,
-            'friction force': fforce}
+    return {"pressure force": pforce, "friction force": fforce}
 
 
-def cf_profile_wall_from_file(file_root, slice_normal,
-                              slice_origin, **kwargs):
+def cf_profile_wall_from_file(file_root, slice_normal, slice_origin, **kwargs):
 
-    wall = PVDReader(FileName=file_root + '_wall.pvd')
+    wall = PVDReader(FileName=file_root + "_wall.pvd")
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
     inp = servermanager.Fetch(clean)
@@ -751,7 +748,7 @@ def cf_profile_wall_from_file(file_root, slice_normal,
     Delete(clean)
     del clean
     Delete(inp)
-    del(inp)
+    del inp
 
     return profile
 
@@ -759,11 +756,11 @@ def cf_profile_wall_from_file(file_root, slice_normal,
 def cf_profile(surface, slice_normal, slice_origin, **kwargs):
 
     alpha = 0.0
-    if 'alpha' in kwargs:
-        alpha = kwargs['alpha']
+    if "alpha" in kwargs:
+        alpha = kwargs["alpha"]
     beta = 0.0
-    if 'beta' in kwargs:
-        beta = kwargs['beta']
+    if "beta" in kwargs:
+        beta = kwargs["beta"]
 
     point_data = CellDatatoPointData(Input=surface)
     point_data.PassCellData = 1
@@ -779,16 +776,17 @@ def cf_profile(surface, slice_normal, slice_origin, **kwargs):
 
     chord_calc = Calculator(Input=slice)
 
-    chord_calc.AttributeType = 'Point Data'
-    chord_calc.Function = ('(coords.iHat - ' + str(offset[0]) + ')/' +
-                           str(offset[1] - offset[0]))
-    chord_calc.ResultArrayName = 'chord'
+    chord_calc.AttributeType = "Point Data"
+    chord_calc.Function = (
+        "(coords.iHat - " + str(offset[0]) + ")/" + str(offset[1] - offset[0])
+    )
+    chord_calc.ResultArrayName = "chord"
 
     cf_calc = Calculator(Input=chord_calc)
 
-    cf_calc.AttributeType = 'Point Data'
-    cf_calc.Function = 'mag(cf)'
-    cf_calc.ResultArrayName = 'cfmag'
+    cf_calc.AttributeType = "Point Data"
+    cf_calc.Function = "mag(cf)"
+    cf_calc.ResultArrayName = "cfmag"
 
     sum = MinMax(Input=slice)
     sum.Operation = "SUM"
@@ -801,17 +799,16 @@ def cf_profile(surface, slice_normal, slice_origin, **kwargs):
     pforce = rotate_vector(pforce, alpha, beta)
     fforce = rotate_vector(fforce, alpha, beta)
 
-    if 'func' in kwargs:
+    if "func" in kwargs:
         sorted_line = PlotOnSortedLines(Input=cf_calc)
         sorted_line.UpdatePipeline()
         extract_client = servermanager.Fetch(sorted_line)
         for_each(extract_client, **kwargs)
 
-    return {'pressure force': pforce,
-            'friction force': fforce}
+    return {"pressure force": pforce, "friction force": fforce}
 
 
-def get_csv_data(filename, header=False, remote=False, delim=' '):
+def get_csv_data(filename, header=False, remote=False, delim=" "):
     """ Get csv data
     """
     if remote:
@@ -829,6 +826,7 @@ def get_csv_data(filename, header=False, remote=False, delim=' '):
         data = table.RowData
     else:
         import pandas as pd
+
         if not header:
             data = pd.read_csv(filename, sep=delim, header=None)
         else:
@@ -844,7 +842,7 @@ def get_fw_csv_data(filename, widths, header=False, remote=False, **kwargs):
         theory.MergeConsecutiveDelimiters = 1
         theory.UseStringDelimiter = 0
         theory.DetectNumericColumns = 1
-        theory.FieldDelimiterCharacters = ' '
+        theory.FieldDelimiterCharacters = " "
         theory.UpdatePipeline()
 
         theory_client = servermanager.Fetch(theory)
@@ -855,11 +853,11 @@ def get_fw_csv_data(filename, widths, header=False, remote=False, **kwargs):
 
     else:
         import pandas as pd
+
         if not header:
-            data = pd.read_fwf(filename, sep=' ', header=None,
-                               widths=widths, **kwargs)
+            data = pd.read_fwf(filename, sep=" ", header=None, widths=widths, **kwargs)
         else:
-            data = pd.read_fwf(filename, sep=' ', width=widths, **kwargs)
+            data = pd.read_fwf(filename, sep=" ", width=widths, **kwargs)
 
     return data
 
@@ -917,27 +915,31 @@ def sum_array(input, array_name):
 
 def get_case_file():
     with cd(remote_dir):
-        get(case_name + '.py', '%(path)s')
+        get(case_name + ".py", "%(path)s")
 
 
 def cat_case_file(remote_dir, case_name):
     with cd(remote_dir):
-        with hide('output', 'running', 'warnings'), settings(warn_only=True):
+        with hide("output", "running", "warnings"), settings(warn_only=True):
             # cmd = 'cat '+case_name+'.py'
             import io
+
             contents = io.StringIO()
-            get(case_name + '.py', contents)
+            get(case_name + ".py", contents)
             # operate on 'contents' like a file object here, e.g. 'print
             return contents.getvalue()
 
 
 def cat_status_file(remote_dir, case_name):
 
-    with cd(remote_dir), hide('output', 'running', 'warnings'), settings(warn_only=True):
+    with cd(remote_dir), hide("output", "running", "warnings"), settings(
+        warn_only=True
+    ):
         # cmd = 'cat '+case_name+'_status.txt'
         import io
+
         contents = io.StringIO()
-        result = get(case_name + '_status.txt', contents)
+        result = get(case_name + "_status.txt", contents)
         if result.succeeded:
             # operate on 'contents' like a file object here, e.g. 'print
             return contents.getvalue()
@@ -946,17 +948,17 @@ def cat_status_file(remote_dir, case_name):
 
 
 def get_case_parameters_str(case_name, **kwargs):
-    #global remote_data, data_dir, data_host, remote_server_auto, paraview_cmd
+    # global remote_data, data_dir, data_host, remote_server_auto, paraview_cmd
     _remote_dir = analysis.data.data_dir
-    if 'data_dir' in kwargs:
-        _remote_dir = kwargs['data_dir']
+    if "data_dir" in kwargs:
+        _remote_dir = kwargs["data_dir"]
     _remote_host = analysis.data.data_host
-    if 'data_host' in kwargs:
-        _remote_host = kwargs['data_host']
+    if "data_host" in kwargs:
+        _remote_host = kwargs["data_host"]
 
     _remote_data = analysis.data.remote_data
-    if 'remote_data' in kwargs:
-        _remote_data = kwargs['remote_data']
+    if "remote_data" in kwargs:
+        _remote_data = kwargs["remote_data"]
 
     if _remote_data:
         env.use_ssh_config = True
@@ -966,17 +968,17 @@ def get_case_parameters_str(case_name, **kwargs):
     else:
         try:
             # Get contents of local file
-            with open(_remote_dir + '/' + case_name + '.py') as f:
+            with open(_remote_dir + "/" + case_name + ".py") as f:
                 case_file_str = f.read()
 
                 if case_file_str is not None:
                     # print status_file_str
                     return case_file_str
                 else:
-                    print('WARNING: ' + case_name + '.py file not found')
+                    print("WARNING: " + case_name + ".py file not found")
                     return None
         except:
-            print('WARNING: ' + case_name + '.py file not found')
+            print("WARNING: " + case_name + ".py file not found")
             return None
 
 
@@ -984,24 +986,24 @@ def get_case_parameters(case_name, **kwargs):
     case_file_str = get_case_parameters_str(case_name, **kwargs)
     namespace = {}
     exec(case_file_str, namespace)
-    return namespace['parameters']
+    return namespace["parameters"]
 
 
 def get_status_dict(case_name, **kwargs):
-    #global remote_data, data_dir, data_host, remote_server_auto, paraview_cmd
+    # global remote_data, data_dir, data_host, remote_server_auto, paraview_cmd
 
     _remote_data = analysis.data.remote_data
-    if 'remote_data' in kwargs:
-        _remote_data = kwargs['remote_data']
+    if "remote_data" in kwargs:
+        _remote_data = kwargs["remote_data"]
 
     _remote_dir = analysis.data.data_dir
-    if 'data_dir' in kwargs:
-        _remote_dir = kwargs['data_dir']
+    if "data_dir" in kwargs:
+        _remote_dir = kwargs["data_dir"]
 
     if _remote_data:
         _remote_host = analysis.data.data_host
-        if 'data_host' in kwargs:
-            _remote_host = kwargs['data_host']
+        if "data_host" in kwargs:
+            _remote_host = kwargs["data_host"]
 
         env.use_ssh_config = True
         env.host_string = _remote_host
@@ -1011,24 +1013,23 @@ def get_status_dict(case_name, **kwargs):
             # print status_file_str
             return json.loads(status_file_str)
         else:
-            print('WARNING: ' + case_name + '_status.txt file not found')
+            print("WARNING: " + case_name + "_status.txt file not found")
             return None
     else:
         try:
             # Get contents of local file
-            with open(_remote_dir + '/' + case_name + '_status.txt') as f:
+            with open(_remote_dir + "/" + case_name + "_status.txt") as f:
                 status_file_str = f.read()
 
                 if status_file_str is not None:
                     # print status_file_str
                     return json.loads(status_file_str)
                 else:
-                    print('WARNING: ' + case_name +
-                          '_status.txt file not found')
+                    print("WARNING: " + case_name + "_status.txt file not found")
                     return None
         except Exception as e:
-            print('WARNING: ' + case_name + '_status.txt file not found')
-            print('Caught exception ' + str(e))
+            print("WARNING: " + case_name + "_status.txt file not found")
+            print("Caught exception " + str(e))
             return None
 
 
@@ -1036,73 +1037,75 @@ def get_num_procs(case_name, **kwargs):
     # remote_host,remote_dir,case_name):
     status = get_status_dict(case_name, **kwargs)
     if status is not None:
-        if 'num processor' in status:
-            return status['num processor']
+        if "num processor" in status:
+            return status["num processor"]
         else:
             return None
     else:
-        print('status file not found')
+        print("status file not found")
 
 
 def get_case_root(case_name, num_procs=None):
     if num_procs is None:
         num_procs = get_num_procs(case_name)
-    return case_name + '_P' + str(num_procs) + '_OUTPUT/' + case_name
+    return case_name + "_P" + str(num_procs) + "_OUTPUT/" + case_name
 
 
 def get_case_report(case):
-    return case + '_report.csv'
+    return case + "_report.csv"
 
 
 def print_html_parameters(parameters):
 
-    reference = parameters['reference']
+    reference = parameters["reference"]
     # material = parameters['material']
     conditions = parameters[reference]
 
     mach = 0.0
     speed = 0.0
 
-    if 'Mach' in conditions['V']:
-        mach = conditions['V']['Mach']
+    if "Mach" in conditions["V"]:
+        mach = conditions["V"]["Mach"]
         speed = 0.0
     else:
-        speed = mag(conditions['V']['vector'])
+        speed = mag(conditions["V"]["vector"])
         mach = 0.0
 
-    if 'Reynolds No' in conditions:
-        reynolds = conditions['Reynolds No']
+    if "Reynolds No" in conditions:
+        reynolds = conditions["Reynolds No"]
     else:
-        reynolds = 'undefined'
+        reynolds = "undefined"
 
-    if 'Reference Length' in conditions:
-        reflength = conditions['Reference Length']
+    if "Reference Length" in conditions:
+        reflength = conditions["Reference Length"]
     else:
-        reflength = 'undefined'
+        reflength = "undefined"
 
     import string
 
-    html_template = '''<table>
+    html_template = """<table>
 <tr><td>pressure</td><td>$pressure</td></tr>
 <tr><td>temperature</td><td>$temperature</td></tr>
 <tr><td>Reynolds No</td><td>$reynolds</td></tr>
 <tr><td>Ref length</td><td>$reflength</td></tr>
 <tr><td>Speed</td><td>$speed</td></tr>
 <tr><td>Mach No</td><td>$mach</td></tr>
-</table>'''
+</table>"""
     html_output = string.Template(html_template)
 
-    return html_output.substitute({'pressure': conditions['pressure'],
-                                   'temperature': conditions['temperature'],
-                                   'reynolds': reynolds,
-                                   'reflength': reflength,
-                                   'speed': speed,
-                                   'mach': mach,
-                                   })
+    return html_output.substitute(
+        {
+            "pressure": conditions["pressure"],
+            "temperature": conditions["temperature"],
+            "reynolds": reynolds,
+            "reflength": reflength,
+            "speed": speed,
+            "mach": mach,
+        }
+    )
 
 
 class ProgressBar(object):
-
     def __init__(self):
         self.pbar = tqdm(total=100)
 
@@ -1117,41 +1120,41 @@ class ProgressBar(object):
         self.pbar.update(i)
 
 
-#remote_data = True
-#data_host = 'user@server'
-#data_dir = 'data'
-#remote_server_auto = True
-#paraview_cmd = 'mpiexec pvserver'
-#paraview_home = '/usr/local/bin/'
-#job_queue = 'default'
-#job_tasks = 1
-#job_ntaskpernode = 1
-#job_project = 'default'
+# remote_data = True
+# data_host = 'user@server'
+# data_dir = 'data'
+# remote_server_auto = True
+# paraview_cmd = 'mpiexec pvserver'
+# paraview_home = '/usr/local/bin/'
+# job_queue = 'default'
+# job_tasks = 1
+# job_ntaskpernode = 1
+# job_project = 'default'
 
 
 def data_location_form_html(**kwargs):
     global remote_data, data_dir, data_host, remote_server_auto, paraview_cmd
     global job_queue, job_tasks, job_ntaskpernode, job_project
 
-    if 'data_dir' in kwargs:
-        data_dir = kwargs['data_dir']
-    if 'paraview_cmd' in kwargs:
-        paraview_cmd = kwargs['paraview_cmd']
-    if 'data_host' in kwargs:
-        data_host = kwargs['data_host']
+    if "data_dir" in kwargs:
+        data_dir = kwargs["data_dir"]
+    if "paraview_cmd" in kwargs:
+        paraview_cmd = kwargs["paraview_cmd"]
+    if "data_host" in kwargs:
+        data_host = kwargs["data_host"]
 
-    remote_data_checked = ''
+    remote_data_checked = ""
     if remote_data:
         remote_data_checked = 'checked="checked"'
-    remote_server_auto_checked = ''
+    remote_server_auto_checked = ""
     if remote_server_auto:
         remote_server_auto_checked = 'checked="checked"'
 
-    remote_cluster_checked = ''
-    job_queue = 'default'
+    remote_cluster_checked = ""
+    job_queue = "default"
     job_tasks = 1
     job_ntaskpernode = 1
-    job_project = 'default'
+    job_project = "default"
 
     input_form = """
 <div style="background-color:gainsboro; border:solid black; width:640px; padding:20px;">
@@ -1236,13 +1239,18 @@ def data_location_form_html(**kwargs):
     </script>
     """
 
-    return HTML(input_form.format(data_dir=data_dir,
-                                  data_host=data_host,
-                                  paraview_cmd=paraview_cmd,
-                                  remote_data_checked=remote_data_checked,
-                                  remote_server_auto_checked=remote_server_auto_checked,
-                                  remote_cluster_checked=remote_cluster_checked,
-                                  job_queue=job_queue,
-                                  job_tasks=job_tasks,
-                                  job_ntaskpernode=job_ntaskpernode,
-                                  job_project=job_project) + javascript)
+    return HTML(
+        input_form.format(
+            data_dir=data_dir,
+            data_host=data_host,
+            paraview_cmd=paraview_cmd,
+            remote_data_checked=remote_data_checked,
+            remote_server_auto_checked=remote_server_auto_checked,
+            remote_cluster_checked=remote_cluster_checked,
+            job_queue=job_queue,
+            job_tasks=job_tasks,
+            job_ntaskpernode=job_ntaskpernode,
+            job_project=job_project,
+        )
+        + javascript
+    )

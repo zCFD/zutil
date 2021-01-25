@@ -11,8 +11,8 @@ def convert(old_pkl):
     Convert a Python 2 pickle to Python 3
     """
     # Make a name for the new pickle
-    new_pkl = os.path.splitext(old_pkl)[0]+"_p3.pkl"
- 
+    new_pkl = os.path.splitext(old_pkl)[0] + "_p3.pkl"
+
     print(new_pkl)
 
     # Convert Python 2 "ObjectType" to Python 3 object
@@ -25,4 +25,3 @@ def convert(old_pkl):
     # Re-save as Python 3 pickle
     with open(new_pkl, "wb") as outfile:
         pickle.dump(loaded, outfile)
-

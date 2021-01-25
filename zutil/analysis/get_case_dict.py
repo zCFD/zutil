@@ -1,4 +1,3 @@
-
 import collections
 import yaml
 import os
@@ -21,24 +20,24 @@ case_dict = collections.OrderedDict()
 def get_case(solve_params, case_dict):
 
     for params in solve_params:
-        controldict = os.path.basename(params['controldict'])
+        controldict = os.path.basename(params["controldict"])
         # Remove .py extension
-        controldict = controldict.rsplit('.', 1)[0]
+        controldict = controldict.rsplit(".", 1)[0]
         case_dict[controldict] = params
-        if 'solve' in params:
-            get_case(params['solve'], case_dict)
+        if "solve" in params:
+            get_case(params["solve"], case_dict)
 
 
-def get_case_dict(default_test_file='generic.zcfd-test.yml'):
+def get_case_dict(default_test_file="generic.zcfd-test.yml"):
 
-    if 'TEST_DEF' in os.environ:
-        test_file = os.environ['TEST_DEF']
+    if "TEST_DEF" in os.environ:
+        test_file = os.environ["TEST_DEF"]
     else:
         test_file = default_test_file
 
     # Get case names from yml file
     test_definition = None
-    with open(test_file, 'r') as test_definition_file:
+    with open(test_file, "r") as test_definition_file:
         try:
             test_definition = yaml.safe_load(test_definition_file)
         except yaml.YAMLError as exc:
@@ -52,9 +51,9 @@ def get_case_dict(default_test_file='generic.zcfd-test.yml'):
             invalid_definition(test_definition)
 
         for key in step:
-            if key == 'solve':
+            if key == "solve":
                 get_case(step[key], case_dict)
-            if key == 'validation':
+            if key == "validation":
                 for params in step[key]:
-                    case = params['case']
+                    case = params["case"]
                     validation_dict[case] = params
