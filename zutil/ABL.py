@@ -70,7 +70,7 @@ def wind_speed_array(height_array, friction_velocity, roughness_length, kappa=0.
 
     May want to consider Deaves & Harris (1978) model for high speed wind
     """
-    return (friction_velocity / kappa * np.log((height_array / roughness_length)))
+    return friction_velocity / kappa * np.log((height_array / roughness_length))
 
 
 def wind_direction_to_beta(wind_dir_deg):
