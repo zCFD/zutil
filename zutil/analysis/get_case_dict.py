@@ -18,14 +18,29 @@ case_dict = collections.OrderedDict()
 
 
 def get_case(solve_params, case_dict):
-
     for params in solve_params:
-        controldict = os.path.basename(params["controldict"])
-        # Remove .py extension
-        controldict = controldict.rsplit(".", 1)[0]
-        case_dict[controldict] = params
-        if "solve" in params:
-            get_case(params["solve"], case_dict)
+        if isinstance(params["controldict"], str):
+            controldict = os.path.basename(params["controldict"])
+            # Remove .py extension
+            controldict = controldict.rsplit(".", 1)[0]
+            case_dict[controldict] = params
+            if "solve" in params:
+                get_case(params["solve"], case_dict)
+        else:
+            import copy
+            mesh_list = params['meshname']
+            case_list = params['controldict']
+
+            for m, c in zip(mesh_list, case_list):
+                controldict = os.path.basename(c)
+                # Remove .py extension
+                controldict = controldict.rsplit(".", 1)[0]
+                params1 = copy.deepcopy(params)
+                params1['meshname'] = m
+                params1['controldict'] = c
+                case_dict[controldict] = params1
+                if "solve" in params:
+                    get_case(params["solve"], case_dict)
 
 
 def get_case_dict(default_test_file="generic.zcfd-test.yml"):
