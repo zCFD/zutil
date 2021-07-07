@@ -200,11 +200,11 @@ class Report(object):
                     y = h
                     self.data.plot(x="Cycle", y=y, ax=ax, legend=False)
                     rolling.plot(x="Cycle", y=y, ax=ax, legend=0)
-                    last_val = self.data[h].tail(1).get_values()
+                    last_val = self.data[h].tail(1).values
                     # $\downarrow$ $\uparrow$ $\leftrightarrow$
                     rolling_grad = (
-                        rolling[h].tail(2).get_values()[0]
-                        - rolling[h].tail(2).get_values()[1]
+                        rolling[h].tail(2).values[0]
+                        - rolling[h].tail(2).values[1]
                     )
                     trend = r"$\leftrightarrow$"
                     if rolling_grad > 0.0:
