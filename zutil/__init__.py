@@ -478,7 +478,7 @@ def create_annulus(turbine_zone_dict):
     for i in range(number_of_segments):
         r = ri
         while r < ro:
-            dr = dtheta * r / (1.0 - 0.5 * dtheta)
+            dr = dtheta * max(r,0.01*ro) / (1.0 - 0.5 * dtheta)
             max_r = r + dr
             if max_r > ro:
                 dr = ro - r
@@ -1243,7 +1243,7 @@ def create_turbine_segments(
         for i in range(number_of_segments):
             r = ri
             while r < ro:
-                dr = old_div(dtheta * r, (1.0 - 0.5 * dtheta))
+                dr = old_div(dtheta * max(r,0.01*ro), (1.0 - 0.5 * dtheta))
                 max_r = r + dr
                 if max_r > ro:
                     dr = ro - r
