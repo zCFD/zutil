@@ -1012,8 +1012,9 @@ def get_num_procs(case_name, **kwargs):
 
 def get_case_root(case_name, num_procs=None):
     if num_procs is None:
-        num_procs = get_num_procs(case_name)
-    return case_name + '_P' + str(num_procs) + '_OUTPUT/' + case_name
+        return case_name + '_OUTPUT/' + case_name
+    else:
+        return case_name + '_P' + str(num_procs) + '_OUTPUT/' + case_name
 
 
 def get_case_report(case):
