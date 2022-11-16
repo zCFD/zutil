@@ -25,7 +25,10 @@ from .post import calc_force_wall
 
 from .post import cp_profile_wall_from_file
 from .post import cf_profile_wall_from_file
+from .post import cp_profile_wall_from_file_span
 
 from .post import get_num_procs
 
 from .post import rotate_vector
+
+from .post import residual_plot
