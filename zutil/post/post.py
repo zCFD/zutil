@@ -406,9 +406,10 @@ def get_monitor_data(file, monitor_name, var_name):
         )
 
 
-def residual_plot(file, pl):
+def residual_plot(file, pl, ncol=3):
     """ Plot the _report file
     """
+    from matplotlib.ticker import FormatStrFormatter
     l2norm = CSVReader(FileName=[file])
     l2norm.HaveHeaders = 1
     l2norm.MergeConsecutiveDelimiters = 1
@@ -426,26 +427,32 @@ def residual_plot(file, pl):
     names = list(data.keys())
 
     num_var = len(names) - 2
-    num_rows = (old_div((num_var - 1), 4)) + 1
+    num_rows = (old_div((num_var - 1), ncol)) + 1
 
-    fig = pl.figure(figsize=(40, 10 * num_rows), dpi=100, facecolor="w", edgecolor="k")
+    fig = pl.figure(figsize=(9, 4 * num_rows), dpi=100, facecolor="w", edgecolor="k")
 
-    fig.suptitle(file, fontsize=40, fontweight="bold")
+    fig.suptitle(file, fontweight="bold")
 
-    for i in range(1, num_var + 1):
-        var_name = names[i]
-        ax = fig.add_subplot(num_rows, 4, i)
-        if "rho" in var_name:
-            ax.set_yscale("log")
-            ax.set_ylabel("l2norm " + var_name, multialignment="center")
-        else:
-            ax.set_ylabel(var_name, multialignment="center")
+    i = 1
+    for var_name in names:
+        if var_name != "Cycle" and var_name != "RealTimeStep":
+            ax = fig.add_subplot(num_rows, ncol, i)
+            i = i + 1
+            if "rho" in var_name:
+                ax.set_yscale("log")
+                ax.set_ylabel("l2norm " + var_name, multialignment="center")
+            else:
+                ax.set_ylabel(var_name, multialignment="center")
 
-        ax.grid(True)
-        ax.set_xlabel("Cycles")
+            ax.grid(True)
+            ax.set_xlabel("Cycles")
+            ax.tick_params(axis='both', labelsize='small')
+            #ax.ticklabel_format(axis='both', style='sci')
+            ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
 
-        ax.plot(data[names[0]], data[names[i]], color="r", label=names[i])
-
+            ax.plot(data["Cycle"], data[var_name], color="r", label=var_name)
+    fig.subplots_adjust(hspace=0.5)
+    fig.subplots_adjust(wspace=0.5)
 
 def for_each(surface, func, **kwargs):
     if surface.IsA("vtkMultiBlockDataSet"):
