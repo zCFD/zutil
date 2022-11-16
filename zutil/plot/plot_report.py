@@ -216,7 +216,7 @@ class Report(object):
                     ax.set_xlabel("cycles")
                     ax.set_ylabel(h)
                     self.visible_fig.append(fig)
-            # plt.show()
+                    plt.show()
             # display(plt)
 
     def plot_forces(self, mean=100):
