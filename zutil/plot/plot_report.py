@@ -219,7 +219,7 @@ class Report(object):
                     plt.show()
             # display(plt)
 
-    def plot_forces(self, mean=100):
+    def plot_forces(self, mean=20):
 
         # Need to disable autoscroll
         # autoscroll(-1)
