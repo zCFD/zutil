@@ -429,9 +429,9 @@ def residual_plot(file, pl, ncol=3):
     num_var = len(names) - 2
     num_rows = (old_div((num_var - 1), ncol)) + 1
 
-    fig = pl.figure(figsize=(9, 4 * num_rows), dpi=100, facecolor="w", edgecolor="k")
+    fig = pl.figure(figsize=(3 * ncol, 3 * num_rows), dpi=100, facecolor="w", edgecolor="k")
 
-    fig.suptitle(file, fontweight="bold")
+    #fig.suptitle(file, fontweight="bold")
 
     i = 1
     for var_name in names:
@@ -453,6 +453,7 @@ def residual_plot(file, pl, ncol=3):
             ax.plot(data["Cycle"], data[var_name], color="r", label=var_name)
     fig.subplots_adjust(hspace=0.5)
     fig.subplots_adjust(wspace=0.5)
+    pl.tight_layout()
 
 def for_each(surface, func, **kwargs):
     if surface.IsA("vtkMultiBlockDataSet"):
@@ -499,6 +500,8 @@ def cp_profile_wall_from_file(file_root, slice_normal, slice_origin, **kwargs):
 def cp_profile_wall_from_file_span(file_root, slice_normal, slice_origin, **kwargs):
 
     wall = PVDReader(FileName=file_root + "_wall.pvd")
+    if 'time' in kwargs:
+        wall.UpdatePipeline(kwargs['time'])
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
     inp = servermanager.Fetch(clean)
