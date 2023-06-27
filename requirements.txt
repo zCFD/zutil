@@ -7,5 +7,5 @@ mpi4py==3.0.3
 numpy==1.22.0
 pandas==1.0.3; python_version > '2.7'
 pandas==0.24.2; python_version == '2.7'
-PyYAML==5.3.1
+PyYAML==5.4
 dill>=0.3.2
