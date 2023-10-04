@@ -102,10 +102,10 @@ def set_ticks(ax):
     ax.tick_params(axis="x")
 
     for tick in ax.xaxis.get_major_ticks():
-        tick.label.set_fontsize(ft.axis_tick_font_size)
-        tick.label.set_fontweight("normal")
-        tick.label.set_color(cl.zeno_orange)
+        tick.label1.set_fontsize(ft.axis_tick_font_size)
+        tick.label1.set_fontweight("normal")
+        tick.label1.set_color(cl.zeno_orange)
     for tick in ax.yaxis.get_major_ticks():
-        tick.label.set_fontsize(ft.axis_tick_font_size)
-        tick.label.set_fontweight("normal")
-        tick.label.set_color(cl.zeno_orange)
+        tick.label1.set_fontsize(ft.axis_tick_font_size)
+        tick.label1.set_fontweight("normal")
+        tick.label1.set_color(cl.zeno_orange)
