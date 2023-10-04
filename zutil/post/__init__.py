@@ -20,8 +20,10 @@ from .post import cf_profile
 from .post import calc_lift_centre_of_action
 from .post import calc_drag_centre_of_action
 from .post import get_monitor_data
+from .post import calc_moment
 
 from .post import calc_force_wall
+from .post import calc_moment_wall
 
 from .post import cp_profile_wall_from_file
 from .post import cf_profile_wall_from_file
