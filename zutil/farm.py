@@ -51,7 +51,6 @@ import vtk
 
 
 def create_mesh_sources(array_data_file, farm_centre, turbine_only=False):
-
     # Read file
 
     array_data = {}
@@ -63,7 +62,7 @@ def create_mesh_sources(array_data_file, farm_centre, turbine_only=False):
     # Cases
     cases = array_data["Cases"]
 
-    for (key, value) in list(cases.items()):
+    for key, value in list(cases.items()):
         # print key
 
         # Wind direction
@@ -75,7 +74,7 @@ def create_mesh_sources(array_data_file, farm_centre, turbine_only=False):
         # List of tuples
         mesh_source_location = []
 
-        for (key, value) in list(turbines.items()):
+        for key, value in list(turbines.items()):
             # print key
             name = key
             if isinstance(key, int):
@@ -115,7 +114,6 @@ def create_mesh_sources(array_data_file, farm_centre, turbine_only=False):
 
 
 def create_turbines(array_data_file, wall_file, volume_file):
-
     array_data = {}
 
     with open(array_data_file, "r") as f:
@@ -153,7 +151,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
     # Cases
     cases = array_data["Cases"]
 
-    for (key, value) in list(cases.items()):
+    for key, value in list(cases.items()):
         # print key
 
         # Wind direction
@@ -165,7 +163,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
         # List of tuples
         location = []
 
-        for (key, value) in list(turbines.items()):
+        for key, value in list(turbines.items()):
             # print key
             name = key
             if isinstance(key, int):
@@ -210,7 +208,7 @@ def create_turbines(array_data_file, wall_file, volume_file):
 
             # Point turbine into the wind
             turbine_normal = [-u, -v, 0.0]
-            mag = math.sqrt(sum(x ** 2 for x in turbine_normal))
+            mag = math.sqrt(sum(x**2 for x in turbine_normal))
             turbine_normal = [-u / mag, -v / mag, 0.0]
 
             generate_turbine(
@@ -249,7 +247,7 @@ def create_zcfd_input(array_data_file, farm_centre):
     # Cases
     cases = array_data["Cases"]
 
-    for (key, value) in list(cases.items()):
+    for key, value in list(cases.items()):
         # print key
 
         # Wind direction
@@ -266,7 +264,7 @@ def create_zcfd_input(array_data_file, farm_centre):
         # List of tuples
         location = []
 
-        for (key, value) in list(turbines.items()):
+        for key, value in list(turbines.items()):
             # print key
             name = key
             if isinstance(key, int):
@@ -308,7 +306,6 @@ def create_zcfd_input(array_data_file, farm_centre):
 
 
 def write_zcfd_zones(zcfd_file_name, location):
-
     with open(zcfd_file_name, "w") as f:
         for idx, val in enumerate(location):
             f.write("'FZ_" + str(idx + 1) + "':{\n")
@@ -364,7 +361,6 @@ def generate_turbine_region(
     turbine_factor=2.0,
     rotate=False,
 ):
-
     # cylinder = Cylinder()
     # cylinder.Radius = 0.5 * turbine_diameter
     # cylinder.Resolution = 128
@@ -398,7 +394,6 @@ def generate_turbine_region(
 def generate_turbine(
     turbine_name, turbine_location, turbine_diameter, wind_direction, rotate=False
 ):
-
     disk = Disk()
     disk.InnerRadius = 0.05 * 0.5 * turbine_diameter
     disk.OuterRadius = 0.5 * turbine_diameter
@@ -422,7 +417,6 @@ def generate_turbine(
 
 
 def write_control_file(control_file_name):
-
     with open(control_file_name, "w") as f:
         f.write("domain:  -50000 50000 -50000 50000 0 1000.0" + "\n")
         f.write("initial: 5000.0" + "\n")
@@ -431,7 +425,6 @@ def write_control_file(control_file_name):
 
 
 def create_source(turbine_location, diameter):
-
     upstream_factor = 1.0
     downstream_factor = 4.0
     radial_factor = 1.0
@@ -468,7 +461,6 @@ def create_source(turbine_location, diameter):
 
 
 def write_solar_bac(bac_file_name, wind_direction, mesh_source):
-
     farfield_mesh_size = 5000.0
 
     with open(bac_file_name, "w") as f:
@@ -742,7 +734,6 @@ def create_trbx_zcfd_input(
     calibration_offset=0.0,
     **kwargs
 ):
-
     # Ensure turbine folder exists
     directory = "./turbine_vtp/"
     if not os.path.exists(directory):
@@ -1304,7 +1295,6 @@ def create_profile(
     mu=1.789e-5,
     latitude=55.0,
 ):
-
     # Using RH Law compute utau using hub values
     utau = ABL.friction_velocity(hub_height_vel, hub_height, roughness, kappa)
 
@@ -1316,7 +1306,7 @@ def create_profile(
 
     print("Ekman Layer top: " + str(geostrophic_plane))
     print("This is top of ABL for neutral conditions")
-    print("Wall Stress: " + str(rho * utau ** 2))
+    print("Wall Stress: " + str(rho * utau**2))
 
     pts = generate_mesh_pts()
 
@@ -1329,12 +1319,12 @@ def create_profile(
     else:
         k_scale = np.ones(len(pts))
 
-    k = k_scale * (utau ** 2) / math.sqrt(cmu)
-    eps = np.ones(len(pts)) * (utau ** 3) / (kappa * (pts + roughness))
+    k = k_scale * (utau**2) / math.sqrt(cmu)
+    eps = np.ones(len(pts)) * (utau**3) / (kappa * (pts + roughness))
     # Note this mut/mu
-    mut = np.maximum(rho * cmu * k ** 2 / (eps * mu), np.ones(len(pts)) * min_mut)
+    mut = np.maximum(rho * cmu * k**2 / (eps * mu), np.ones(len(pts)) * min_mut)
     TI = np.maximum((2 * k / 3) ** 0.5 / vel, np.ones(len(pts)) * min_ti)
-    lengthscale = cmu ** 0.75 * k ** 1.5 / eps
+    lengthscale = cmu**0.75 * k**1.5 / eps
 
     du_dz = np.gradient(vel, pts, edge_order=2)
 
@@ -1451,7 +1441,6 @@ def generate_inputs(
     min_mut,
     scale_k=True,
 ):
-
     # Generate new name for this case
     case_name = get_case_name(base_case, wind_direction, wind_speed)
     profile_name = get_profile_name(base_case, wind_direction, wind_speed)

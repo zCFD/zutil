@@ -245,15 +245,15 @@ def R_2vect(R, vector_orig, vector_fin):
     sa = sin(angle)
 
     # Calculate the rotation matrix elements.
-    R[0, 0] = 1.0 + (1.0 - ca) * (x ** 2 - 1.0)
+    R[0, 0] = 1.0 + (1.0 - ca) * (x**2 - 1.0)
     R[0, 1] = -z * sa + (1.0 - ca) * x * y
     R[0, 2] = y * sa + (1.0 - ca) * x * z
     R[1, 0] = z * sa + (1.0 - ca) * x * y
-    R[1, 1] = 1.0 + (1.0 - ca) * (y ** 2 - 1.0)
+    R[1, 1] = 1.0 + (1.0 - ca) * (y**2 - 1.0)
     R[1, 2] = -x * sa + (1.0 - ca) * y * z
     R[2, 0] = -y * sa + (1.0 - ca) * x * z
     R[2, 1] = x * sa + (1.0 - ca) * y * z
-    R[2, 2] = 1.0 + (1.0 - ca) * (z ** 2 - 1.0)
+    R[2, 2] = 1.0 + (1.0 - ca) * (z**2 - 1.0)
 
 
 def vector_vector_rotate(vec, axis, origin, theta):
@@ -394,8 +394,8 @@ def glauert_peters(y):
     p3 = (
         1.0
         + (457.0 / 1280.0) * y
-        + (51.0 / 640.0) * y ** 2
-        + y ** 3 / 160.0
+        + (51.0 / 640.0) * y**2
+        + y**3 / 160.0
         + 3.0 / 2.0 * y * p2
     )
     power_coeff = p1 * p3
@@ -478,7 +478,7 @@ def create_annulus(turbine_zone_dict):
     for i in range(number_of_segments):
         r = ri
         while r < ro:
-            dr = dtheta * max(r,0.01*ro) / (1.0 - 0.5 * dtheta)
+            dr = dtheta * max(r, 0.01 * ro) / (1.0 - 0.5 * dtheta)
             max_r = r + dr
             if max_r > ro:
                 dr = ro - r
@@ -782,7 +782,7 @@ def create_turbine_segments(
         # Assuming 1D momentum theory and the Betz limit
         u_infty = (3.0 / 2.0) * u_ref
 
-    betz_power = 0.5 * density * u_infty ** 3 * rotor_swept_area * (16.0 / 27.0)
+    betz_power = 0.5 * density * u_infty**3 * rotor_swept_area * (16.0 / 27.0)
     if use_glauert_power:
         if "glauert power curve" not in turbine_zone_dict:
             gp_curve = []
@@ -798,7 +798,7 @@ def create_turbine_segments(
             for ts_val in ts_vals:
                 b0 = np.interp(ts, peters_lr_vals[::-1], b_vals[::-1])
                 y = 3.0 * b0 - 1.0
-                gp = 0.5 * density * u_infty ** 3 * rotor_swept_area * glauert_peters(y)
+                gp = 0.5 * density * u_infty**3 * rotor_swept_area * glauert_peters(y)
                 gp.append([ts_val, gp])
             turbine_zone_dict["glauert power curve"] = gp
         glauert_power = np.interp(
@@ -874,7 +874,7 @@ def create_turbine_segments(
                 theta_rel = math.atan(v_n / ((rp * omega) - v_r))
             else:
                 theta_rel = math.pi / 2.0
-            urel = math.sqrt((rp * omega - v_r) ** 2 + v_n ** 2)
+            urel = math.sqrt((rp * omega - v_r) ** 2 + v_n**2)
             beta_twist = np.interp(
                 old_div(rp, ro), np.array(blade_twist).T[0], np.array(blade_twist).T[1]
             )
@@ -906,8 +906,8 @@ def create_turbine_segments(
                     )
                     cl = cl * tip_loss_factor
                     cd = cd * tip_loss_factor
-            f_L = cl * 0.5 * density * urel ** 2 * chord
-            f_D = cd * 0.5 * density * urel ** 2 * chord
+            f_L = cl * 0.5 * density * urel**2 * chord
+            f_D = cd * 0.5 * density * urel**2 * chord
             F_L = old_div(nblades, (2.0 * math.pi * rp)) * f_L
             F_D = old_div(nblades, (2.0 * math.pi * rp)) * f_D
             dt = -(F_L * math.cos(theta_rel) - F_D * math.sin(theta_rel)) * da
@@ -971,7 +971,7 @@ def create_turbine_segments(
                 omega_air = np.dot(local_omega_vec, ulocal) / rp
                 omega_rel = omega - omega_air
                 u_ref_local = -np.dot(ulocal, disc_normal)
-                urel = math.sqrt((rp * omega_rel) ** 2 + u_ref_local ** 2)
+                urel = math.sqrt((rp * omega_rel) ** 2 + u_ref_local**2)
                 if (rp * omega_rel) > 0.0:
                     theta_rel = math.atan(old_div(u_ref_local, (rp * omega_rel)))
                 else:
@@ -1010,8 +1010,8 @@ def create_turbine_segments(
                     np.array(aerofoil_cd).T[0],
                     np.array(aerofoil_cd).T[1],
                 )
-                f_L = cl * 0.5 * density * urel ** 2 * chord
-                f_D = cd * 0.5 * density * urel ** 2 * chord
+                f_L = cl * 0.5 * density * urel**2 * chord
+                f_D = cd * 0.5 * density * urel**2 * chord
                 F_L = old_div(nblades, (2.0 * math.pi * rp)) * f_L
                 F_D = old_div(nblades, (2.0 * math.pi * rp)) * f_D
                 dt = (
@@ -1084,17 +1084,25 @@ def create_turbine_segments(
                     blade_pitch = blade_pitch_low
                 if (MPI.COMM_WORLD.Get_rank() == 0) and verbose:
                     print("Rated power blade pitch =  : " + str(blade_pitch))
-                total_torque, total_area, total_thrust, angular_induction, annulus = bet_kernel(
-                    blade_pitch
-                )
+                (
+                    total_torque,
+                    total_area,
+                    total_thrust,
+                    angular_induction,
+                    annulus,
+                ) = bet_kernel(blade_pitch)
                 torque_blades = 0.0
             else:
                 # Use half of the available torque to accelerate the blades and half to provide power to the generator
                 # unless this exceeds a 5% increase in the rate of rotation or the tip speed limit or the rated power.
                 blade_pitch = blade_pitch_opt
-                total_torque, total_area, total_thrust, angular_induction, annulus = bet_kernel(
-                    blade_pitch
-                )
+                (
+                    total_torque,
+                    total_area,
+                    total_thrust,
+                    angular_induction,
+                    annulus,
+                ) = bet_kernel(blade_pitch)
                 torque_blades = total_torque / 2.0  # Completely arbitrary.
                 # modfy the tip speed limit if there is an rpm ramp:
                 if "rpm ramp" in turbine_zone_dict:
@@ -1162,7 +1170,17 @@ def create_turbine_segments(
                 annulus,
             )
 
-        blade_pitch, omega, torque_blades, torque_power, total_torque, total_area, total_thrust, angular_induction, annulus = turbine_controller(
+        (
+            blade_pitch,
+            omega,
+            torque_blades,
+            torque_power,
+            total_torque,
+            total_area,
+            total_thrust,
+            angular_induction,
+            annulus,
+        ) = turbine_controller(
             omega,
             rated_power,
             tip_speed_limit,
@@ -1235,7 +1253,10 @@ def create_turbine_segments(
             if verbose and (MPI.COMM_WORLD.Get_rank() == 0):
                 print("Induction factor: ", str(ind_fac))
         dtheta = math.radians(360.0 / number_of_segments)
-        target_torque = old_div(power, omega)
+        if omega > 0:
+            target_torque = old_div(power, omega)
+        else:
+            target_torque = 0.0
         theta = 0.0
         total_area = 0.0
         total_thrust = 0.0
@@ -1243,7 +1264,7 @@ def create_turbine_segments(
         for i in range(number_of_segments):
             r = ri
             while r < ro:
-                dr = old_div(dtheta * max(r,0.01*ro), (1.0 - 0.5 * dtheta))
+                dr = old_div(dtheta * max(r, 0.01 * ro), (1.0 - 0.5 * dtheta))
                 max_r = r + dr
                 if max_r > ro:
                     dr = ro - r
@@ -1263,7 +1284,7 @@ def create_turbine_segments(
                     lambda_r = old_div(rp * omega, u_ref)
                     if lambda_r > 0.0:
                         ang_ind_fac = -0.5 + math.sqrt(
-                            0.25 + old_div(ind_fac * (1.0 - ind_fac), lambda_r ** 2)
+                            0.25 + old_div(ind_fac * (1.0 - ind_fac), lambda_r**2)
                         )
                     else:
                         ang_ind_fac = 0.0
@@ -1497,7 +1518,6 @@ def convolution2(
     weighted_sum = np.zeros(len(disc))
 
     for cell_idx, cell_centre in enumerate(cell_centre_list):
-
         cell_dt = [0.0, 0.0, 0.0]
         cell_dq = [0.0, 0.0, 0.0]
 
@@ -1530,8 +1550,8 @@ def convolution2(
                 # 3D kernel
                 eta = (
                     1.0
-                    / ((epsilon ** 2) * math.sqrt(math.pi) ** 3)
-                    * math.exp(-(old_div(distance, epsilon)) ** 2)
+                    / ((epsilon**2) * math.sqrt(math.pi) ** 3)
+                    * math.exp(-((old_div(distance, epsilon)) ** 2))
                 )
                 # /math.fabs(dot(disc_normal,unit_distance_vec))
 
@@ -1613,7 +1633,7 @@ def convolution2(
                 eta = (
                     1.0
                     / (epsilon * math.sqrt(math.pi))
-                    * math.exp(-(old_div(distance, epsilon)) ** 2)
+                    * math.exp(-((old_div(distance, epsilon)) ** 2))
                 )
 
                 # Add max as eta may be zero due to underflow in the exponent
@@ -1629,7 +1649,6 @@ def convolution2(
     weighted_sum = totals
 
     for cell_idx, cell_centre in enumerate(cell_centre_list):
-
         cell_dt = [0.0, 0.0, 0.0]
         cell_dq = [0.0, 0.0, 0.0]
 
@@ -1662,8 +1681,8 @@ def convolution2(
                 # 3D kernel
                 eta = (
                     1.0
-                    / ((epsilon ** 2) * math.sqrt(math.pi) ** 3)
-                    * math.exp(-(old_div(distance, epsilon)) ** 2)
+                    / ((epsilon**2) * math.sqrt(math.pi) ** 3)
+                    * math.exp(-((old_div(distance, epsilon)) ** 2))
                 )
                 # /math.fabs(dot(disc_normal,unit_distance_vec))
 
@@ -1754,7 +1773,7 @@ def convolution2(
                 eta = (
                     1.0
                     / (epsilon * math.sqrt(math.pi))
-                    * math.exp(-(old_div(distance, epsilon)) ** 2)
+                    * math.exp(-((old_div(distance, epsilon)) ** 2))
                 )
 
                 redistribution_weight = weighted_sum[min_index]

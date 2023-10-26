@@ -110,7 +110,7 @@ class GeomFilterGT(object):
 def calc_force_from_file(
     file_name, ignore_zone, half_model=False, filter=None, **kwargs
 ):
-    """ Calculates the pressure and friction force
+    """Calculates the pressure and friction force
 
     This function requires that the VTK file contains three cell data arrays
     called pressureforce, frictionforce and zone
@@ -133,7 +133,6 @@ def calc_force_from_file(
 
 
 def calc_force_wall(file_root, ignore_zone, half_model=False, filter=None, **kwargs):
-
     wall = PVDReader(FileName=file_root + "_wall.pvd")
     wall.UpdatePipeline()
 
@@ -144,7 +143,6 @@ def calc_force_wall(file_root, ignore_zone, half_model=False, filter=None, **kwa
 
 
 def calc_force(surface_data, ignore_zone, half_model=False, filter=None, **kwargs):
-
     alpha = 0.0
     if "alpha" in kwargs:
         alpha = kwargs["alpha"]
@@ -170,8 +168,17 @@ def calc_force(surface_data, ignore_zone, half_model=False, filter=None, **kwarg
     return pforce, fforce
 
 
-def calc_moment(surface_data, ignore_zone, half_model=False, filter=None, **kwargs):
+def calc_moment_wall(file_root, ignore_zone, half_model=False, filter=None, **kwargs):
+    wall = PVDReader(FileName=file_root + "_wall.pvd")
+    wall.UpdatePipeline()
 
+    moment = calc_moment(wall, ignore_zone, half_model, filter, **kwargs)
+    Delete(wall)
+    del wall
+    return moment
+
+
+def calc_moment(surface_data, ignore_zone, half_model=False, filter=None, **kwargs):
     alpha = 0.0
     if "alpha" in kwargs:
         alpha = kwargs["alpha"]
@@ -261,7 +268,7 @@ def move_moment_ref_point(moment, ref_point, new_ref_point):
 
 
 def get_span(wall):
-    """ Returns the min and max y ordinate
+    """Returns the min and max y ordinate
 
     Args:
         wall (vtkMultiBlockDataSet): The input surface
@@ -300,7 +307,7 @@ def get_span(wall):
 
 
 def get_chord(slice, rotate_geometry=[0.0, 0.0, 0.0]):
-    """ Returns the min and max x ordinate
+    """Returns the min and max x ordinate
 
     Args:
         wall (vtkMultiBlockDataSet): The input surface
@@ -347,7 +354,6 @@ def get_chord(slice, rotate_geometry=[0.0, 0.0, 0.0]):
 
 
 def get_chord_spanwise(slice):
-
     Calculator1 = Calculator(Input=slice)
 
     Calculator1.AttributeType = "Point Data"
@@ -379,8 +385,7 @@ def get_chord_spanwise(slice):
 
 
 def get_monitor_data(file, monitor_name, var_name):
-    """ Return the _report file data corresponding to a monitor point and variable name
-        """
+    """Return the _report file data corresponding to a monitor point and variable name"""
     monitor = CSVReader(FileName=[file])
     monitor.HaveHeaders = 1
     monitor.MergeConsecutiveDelimiters = 1
@@ -407,9 +412,9 @@ def get_monitor_data(file, monitor_name, var_name):
 
 
 def residual_plot(file, pl, ncol=3):
-    """ Plot the _report file
-    """
+    """Plot the _report file"""
     from matplotlib.ticker import FormatStrFormatter
+
     l2norm = CSVReader(FileName=[file])
     l2norm.HaveHeaders = 1
     l2norm.MergeConsecutiveDelimiters = 1
@@ -429,9 +434,11 @@ def residual_plot(file, pl, ncol=3):
     num_var = len(names) - 2
     num_rows = (old_div((num_var - 1), ncol)) + 1
 
-    fig = pl.figure(figsize=(3 * ncol, 3 * num_rows), dpi=100, facecolor="w", edgecolor="k")
+    fig = pl.figure(
+        figsize=(3 * ncol, 3 * num_rows), dpi=100, facecolor="w", edgecolor="k"
+    )
 
-    #fig.suptitle(file, fontweight="bold")
+    # fig.suptitle(file, fontweight="bold")
 
     i = 1
     for var_name in names:
@@ -446,14 +453,15 @@ def residual_plot(file, pl, ncol=3):
 
             ax.grid(True)
             ax.set_xlabel("Cycles")
-            ax.tick_params(axis='both', labelsize='small')
-            #ax.ticklabel_format(axis='both', style='sci')
-            ax.yaxis.set_major_formatter(FormatStrFormatter('%.1e'))
+            ax.tick_params(axis="both", labelsize="small")
+            # ax.ticklabel_format(axis='both', style='sci')
+            ax.yaxis.set_major_formatter(FormatStrFormatter("%.1e"))
 
             ax.plot(data["Cycle"], data[var_name], color="r", label=var_name)
     fig.subplots_adjust(hspace=0.5)
     fig.subplots_adjust(wspace=0.5)
     pl.tight_layout()
+
 
 def for_each(surface, func, **kwargs):
     if surface.IsA("vtkMultiBlockDataSet"):
@@ -476,7 +484,6 @@ def for_each(surface, func, **kwargs):
 
 
 def cp_profile_wall_from_file(file_root, slice_normal, slice_origin, **kwargs):
-
     wall = PVDReader(FileName=file_root + "_wall.pvd")
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
@@ -498,10 +505,9 @@ def cp_profile_wall_from_file(file_root, slice_normal, slice_origin, **kwargs):
 
 
 def cp_profile_wall_from_file_span(file_root, slice_normal, slice_origin, **kwargs):
-
     wall = PVDReader(FileName=file_root + "_wall.pvd")
-    if 'time' in kwargs:
-        wall.UpdatePipeline(kwargs['time'])
+    if "time" in kwargs:
+        wall.UpdatePipeline(kwargs["time"])
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
     inp = servermanager.Fetch(clean)
@@ -522,7 +528,6 @@ def cp_profile_wall_from_file_span(file_root, slice_normal, slice_origin, **kwar
 
 
 def cp_profile(surface, slice_normal, slice_origin, **kwargs):
-
     alpha = 0.0
     if "alpha" in kwargs:
         alpha = kwargs["alpha"]
@@ -688,7 +693,6 @@ def cp_profile(surface, slice_normal, slice_origin, **kwargs):
 
 
 def cp_profile_span(surface, slice_normal, slice_origin, **kwargs):
-
     alpha = 0.0
     if "alpha" in kwargs:
         alpha = kwargs["alpha"]
@@ -742,7 +746,6 @@ def cp_profile_span(surface, slice_normal, slice_origin, **kwargs):
 
 
 def cf_profile_wall_from_file(file_root, slice_normal, slice_origin, **kwargs):
-
     wall = PVDReader(FileName=file_root + "_wall.pvd")
     clean = CleantoGrid(Input=wall)
     clean.UpdatePipeline()
@@ -764,7 +767,6 @@ def cf_profile_wall_from_file(file_root, slice_normal, slice_origin, **kwargs):
 
 
 def cf_profile(surface, slice_normal, slice_origin, **kwargs):
-
     alpha = 0.0
     if "alpha" in kwargs:
         alpha = kwargs["alpha"]
@@ -819,8 +821,7 @@ def cf_profile(surface, slice_normal, slice_origin, **kwargs):
 
 
 def get_csv_data(filename, header=False, remote=False, delim=" "):
-    """ Get csv data
-    """
+    """Get csv data"""
     if remote:
         theory = CSVReader(FileName=[filename])
         theory.HaveHeaders = 0
@@ -845,7 +846,6 @@ def get_csv_data(filename, header=False, remote=False, delim=" "):
 
 
 def get_fw_csv_data(filename, widths, header=False, remote=False, **kwargs):
-
     if remote:
         theory = CSVReader(FileName=[filename])
         theory.HaveHeaders = 0
@@ -941,7 +941,6 @@ def cat_case_file(remote_dir, case_name):
 
 
 def cat_status_file(remote_dir, case_name):
-
     with cd(remote_dir), hide("output", "running", "warnings"), settings(
         warn_only=True
     ):
@@ -1066,7 +1065,6 @@ def get_case_report(case):
 
 
 def print_html_parameters(parameters):
-
     reference = parameters["reference"]
     # material = parameters['material']
     conditions = parameters[reference]

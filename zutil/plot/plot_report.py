@@ -44,7 +44,6 @@ class Report(object):
         self.rolling_avg = 100
 
     def plot_test(self, report_file):
-
         self.resildual_checkboxes = []
         cb_container = widgets.VBox()
         display(cb_container)
@@ -92,12 +91,10 @@ class Report(object):
                 self.residual_list.append(h + append_str)
 
     def plot_multiple(self, report_file_list, variable_list, out_file):
-
         fig = plt.figure(figsize=(8, 5), dpi=100)
 
         handles_ = []
         for f in report_file_list:
-
             if not os.path.isfile(f):
                 print("File not found: " + str(f))
                 continue
@@ -110,11 +107,10 @@ class Report(object):
 
             data = np.genfromtxt(f, skip_header=1)
             for v in range(0, len(vars) - 2):
-
                 variable_name = vars[v + 2]
                 if len(variable_list) != 0 and variable_name not in variable_list:
                     continue
-                line, = plt.semilogy(
+                (line,) = plt.semilogy(
                     data[:, 1], data[:, v + 2], label=case_name + " " + variable_name
                 )
                 handles_.append(line)
@@ -181,7 +177,6 @@ class Report(object):
         self.visible_fig = []
 
     def plot_data(self, b):
-
         # Delete visbible figures
         # for f in self.visible_fig:
         #    f.clear()
@@ -203,8 +198,7 @@ class Report(object):
                     last_val = self.data[h].tail(1).values
                     # $\downarrow$ $\uparrow$ $\leftrightarrow$
                     rolling_grad = (
-                        rolling[h].tail(2).values[0]
-                        - rolling[h].tail(2).values[1]
+                        rolling[h].tail(2).values[0] - rolling[h].tail(2).values[1]
                     )
                     trend = r"$\leftrightarrow$"
                     if rolling_grad > 0.0:
@@ -220,7 +214,6 @@ class Report(object):
             # display(plt)
 
     def plot_forces(self, mean=20):
-
         # Need to disable autoscroll
         # autoscroll(-1)
 
@@ -264,7 +257,6 @@ class Report(object):
         display(self.button)
 
     def plot_performance(self, log_file):
-
         if not os.path.isfile(log_file):
             print("File not found: " + str(log_file))
             return

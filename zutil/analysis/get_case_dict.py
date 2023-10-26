@@ -28,23 +28,23 @@ def get_case(solve_params, case_dict):
                 get_case(params["solve"], case_dict)
         else:
             import copy
-            mesh_list = params['meshname']
-            case_list = params['controldict']
+
+            mesh_list = params["meshname"]
+            case_list = params["controldict"]
 
             for m, c in zip(mesh_list, case_list):
                 controldict = os.path.basename(c)
                 # Remove .py extension
                 controldict = controldict.rsplit(".", 1)[0]
                 params1 = copy.deepcopy(params)
-                params1['meshname'] = m
-                params1['controldict'] = c
+                params1["meshname"] = m
+                params1["controldict"] = c
                 case_dict[controldict] = params1
                 if "solve" in params:
                     get_case(params["solve"], case_dict)
 
 
 def get_case_dict(default_test_file="generic.zcfd-test.yml"):
-
     if "TEST_DEF" in os.environ:
         test_file = os.environ["TEST_DEF"]
     else:

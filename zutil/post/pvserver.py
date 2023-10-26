@@ -27,7 +27,6 @@ use_multiprocess = True
 
 
 def pvserver(c, remote_dir, paraview_cmd, paraview_port, paraview_remote_port):
-
     with c.forward_remote(
         remote_port=int(paraview_remote_port), local_port=int(paraview_port)
     ), c.cd(remote_dir):
@@ -53,7 +52,6 @@ def pvcluster(
     paraview_remote_port,
     job_dict,
 ):
-
     with c.forward_remote(
         remote_port=int(paraview_remote_port), local_port=int(paraview_port)
     ):
@@ -101,7 +99,6 @@ def test_ssh(status, **kwargs):
 
 
 def test_ssh_mp(**kwargs):
-
     # print 'Starting test ssh'
     status = Value("i", 1)
     process_id = mp.Process(target=test_ssh, args=(status,), kwargs=kwargs)
@@ -114,7 +111,6 @@ def test_ssh_mp(**kwargs):
 
 
 def test_remote_tunnel(**kwargs):
-
     _remote_host = analysis.data.data_host
     if "data_host" in kwargs:
         _remote_host = kwargs["data_host"]
@@ -130,7 +126,6 @@ def test_remote_tunnel(**kwargs):
 
 
 def get_remote_port(**kwargs):
-
     _remote_host = analysis.data.data_host
     if "data_host" in kwargs:
         _remote_host = kwargs["data_host"]
@@ -163,7 +158,6 @@ def get_remote_port(**kwargs):
 
 
 def test_remote_port(port_test, port, paraview_port, remote_host):
-
     try:
         # env.use_ssh_config = True
         c = Connection(remote_host)
@@ -239,7 +233,6 @@ def pvcluster_process(**kwargs):
 
 
 def pvserver_process(**kwargs):
-
     # global remote_data, data_dir, data_host, remote_server_auto
     # global paraview_cmd, paraview_home, paraview_port, paraview_remote_port
 

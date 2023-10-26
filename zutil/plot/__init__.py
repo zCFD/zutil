@@ -98,7 +98,6 @@ def set_legend(ax, location, label_list=None):
 
 
 def set_ticks(ax):
-
     ax.tick_params(axis="x")
 
     for tick in ax.xaxis.get_major_ticks():
