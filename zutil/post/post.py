@@ -167,6 +167,15 @@ def calc_force(surface_data, ignore_zone, half_model=False, filter=None, **kwarg
 
     return pforce, fforce
 
+def calc_moment_wall(file_root, ignore_zone, half_model=False, filter=None, **kwargs):
+
+    wall = PVDReader(FileName=file_root + "_wall.pvd")
+    wall.UpdatePipeline()
+
+    moment = calc_moment(wall, ignore_zone, half_model, filter, **kwargs)
+    Delete(wall)
+    del wall
+    return moment
 
 def calc_moment_wall(file_root, ignore_zone, half_model=False, filter=None, **kwargs):
     wall = PVDReader(FileName=file_root + "_wall.pvd")
