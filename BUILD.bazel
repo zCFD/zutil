@@ -1,0 +1,19 @@
+# introduced this so that
+# can import zutil into fwh for run_fwh
+# we have to do it like this (with this tiny __init__.py ) since
+# otherwise bazel gets confused since we've got zutil/zutil.
+# we wouldn't have to do that with zcfd_validate if we wanted that.
+load("@zdeps//:requirements.bzl", "requirement")
+
+#importable
+py_library(
+    name = "zutil",
+    srcs = [
+        "__init__.py",
+    ],
+    imports = ["."],
+    visibility = ["//visibility:public"],
+    deps = [
+        "//zutil/zutil",
+    ],
+)

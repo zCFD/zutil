@@ -6,9 +6,11 @@ import dill
 import pickle
 
 
-def convert(old_pkl):
+def convert(old_pkl: str) -> str:
     """
     Convert a Python 2 pickle to Python 3
+
+    old_pkl = path to Python 2 pickle file
     """
     # Make a name for the new pickle
     new_pkl = os.path.splitext(old_pkl)[0] + "_p3.pkl"

@@ -1,233 +1,172 @@
-from builtins import str
-from builtins import range
-from builtins import object
-from zutil.post import get_csv_data
-import ipywidgets.widgets as widgets
-from IPython import display as dp
+"""
+Copyright (c) 2012-2024, Zenotech Ltd
+All rights reserved.
 
-from zutil.plot import plt
-from zutil.plot import display
-from zutil.plot import batch
-from zutil.plot import pd
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Zenotech Ltd nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
 
-import numpy as np
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL ZENOTECH LTD BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+Helper functions for plotting zCFD report files
+"""
+
 import matplotlib.pyplot as plt
-import matplotlib.animation as animation
 import os
-
-from IPython.display import Javascript
-
-
-def autoscroll(threshhold):
-    if threshhold == 0:  # alway scroll !not good
-        javastring = """
-        IPython.OutputArea.prototype._should_scroll = function(lines) {
-            return true;
-        }
-        """
-    elif threshhold == -1:  # never scroll !not good
-        javastring = """
-        IPython.OutputArea.prototype._should_scroll = function(lines) {
-            return false;
-        }
-        """
-    else:
-        javastring = "IPython.OutputArea.auto_scroll_threshold = " + str(threshhold)
-    display(Javascript(javastring))
+import ipywidgets.widgets as widgets
+from IPython.display import display
+import pandas as pd
+import re
+from zutil.fileutils import (
+    zCFD_Result,
+    get_zcfd_result,
+    zCFD_Result,
+    zCFD_Overset_Result,
+)
+from pathlib import Path
+from typing import Optional
+import warnings
 
 
-class Report(object):
-    def __init__(self):
-        self.header_list = None
+class zCFD_Plots:
+    """helper class to produce plots for zCFD report files"""
+
+    def __init__(self, control_file_str) -> None:
+        self.result = get_zcfd_result(control_file_str)
+
+        if isinstance(self.result, zCFD_Overset_Result):
+            self.overset = True
+        elif isinstance(self.result, zCFD_Result):
+            self.overset = False
+        else:
+            raise ValueError("Unknown result type")
+
+        self.reports = []
+
+        if self.overset:
+            for result in self.result.overset_cases:
+                self.reports.append(Report(result.control_file_path))
+        else:
+            self.reports.append(Report(self.result.control_file_path))
+
+    def plot_residuals(self) -> None:
+        """Plot residuals for all reports"""
+        for report in self.reports:
+            report.plot_residuals()
+
+    def plot_forces(self, mean: int = 20) -> None:
+        """Plot forces for all reports"""
+        for report in self.reports:
+            report.plot_forces(mean)
+
+    def plot_performance(self) -> None:
+        """Plot performance for all reports"""
+        if self.overset:
+            # only one log file exists here for overset cases
+            print("Log file information is currently limited for overset cases")
+            _performance_plot(self.result.log_file_path)
+            self.reports[0].plot_linear_solve_memory_usage()
+        else:
+            for report in self.reports:
+                report.plot_performance()
+
+    def plot_linear_solve_memory_usage(self) -> None:
+        """Plot AMGX memory usage for all reports"""
+        for report in self.reports:
+            report.plot_linear_solve_memory_usage()
+
+
+class Report(zCFD_Result):
+    """Extension of zCFD_Result class to add plotting functions"""
+
+    def __init__(self, control_file: Optional[str] = None) -> None:
+        super().__init__(control_file)
         self.cb_container = None
         self.button = None
         self.rolling_avg = 100
 
-    def plot_test(self, report_file):
-        self.resildual_checkboxes = []
-        cb_container = widgets.VBox()
-        display(cb_container)
-        for h in self.header_list:
-            if h not in self.residual_list and h not in ["RealTimeStep", "Cycle"]:
-                self.checkboxes.append(
-                    widgets.Checkbox(description=h, value=False, width=90)
-                )
-
-        row_list = []
-        for i in range(0, len(self.checkboxes), 3):
-            row = widgets.HBox()
-            row.children = self.checkboxes[i : i + 3]
-            row_list.append(row)
-
-        cb_container.children = [i for i in row_list]
-
-    def read_data(self, report_file):
-        self.data = get_csv_data(report_file, header=True).dropna(axis=1, how="all")
-
-        # Check for restart by
-        restart_file = report_file.rsplit(".csv", 1)[0] + ".restart.csv"
-        if os.path.isfile(restart_file):
-            self.restart_data = get_csv_data(restart_file, header=True).dropna(
-                axis=1, how="all"
+        if not control_file:
+            print("Report() is deprecated, use zcfd_plots(path_to_controlfile) instead")
+            warnings.warn(
+                "Report() is deprecated, use zcfd_plots(path_to_controlfile) instead",
+                DeprecationWarning,
             )
-            # Get first entry in new data
-            restart_cycle = self.data["Cycle"].iloc[0]
-            self.restart_data = self.restart_data[
-                self.restart_data["Cycle"] < restart_cycle
-            ]
-            # Merge restart data with data
-            self.data = pd.concat([self.restart_data, self.data], ignore_index=True)
 
-        # if self.append_index > 0:
-        #    self.data = self.data.add_suffix('_' + str(self.append_index))
+    def plot(self, csv_name):
+        """code to support legacy plotting functionality"""
+        # remove _report.csv from csv_name
+        print("plot(csv_name) function is deprecated, use plot_residuals() instead")
+        control_name = csv_name.replace("_report.csv", "")
+        self.read_control_file(control_name)
+        self.plot_residuals()
+        # print depreciation warning
 
-        self.header_list = list(self.data)
-        self.residual_list = []
-        for h in self.header_list:
-            if h.startswith("rho") or h == "p" or h.startswith("turbEqn"):
-                append_str = ""
-                # if append_index > 0:
-                #    append_str = '_'+str(append_index)
-                self.residual_list.append(h + append_str)
-
-    def plot_multiple(self, report_file_list, variable_list, out_file):
-        fig = plt.figure(figsize=(8, 5), dpi=100)
-
-        handles_ = []
-        for f in report_file_list:
-            if not os.path.isfile(f):
-                print("File not found: " + str(f))
-                continue
-
-            case_name = f[:-11]
-
-            vars = []
-            with open(f, "r") as ff:
-                vars = ff.readline().split()
-
-            data = np.genfromtxt(f, skip_header=1)
-            for v in range(0, len(vars) - 2):
-                variable_name = vars[v + 2]
-                if len(variable_list) != 0 and variable_name not in variable_list:
-                    continue
-                (line,) = plt.semilogy(
-                    data[:, 1], data[:, v + 2], label=case_name + " " + variable_name
-                )
-                handles_.append(line)
-
-        plt.legend(handles=handles_)
-        plt.xlabel("cycles")
-        plt.ylabel("RMS residual")
-        plt.show()
-        if batch:
-            fig.savefig(out_file + ".png", dpi=100)
-        plt.show()
-        self.visible_fig = []
-
-    def plot(self, refile):
+    def plot_residuals(self) -> None:
+        """Plot residual data from report_file"""
         fig = plt.figure(figsize=(8, 5), dpi=100)
         ax = fig.gca()
 
-        self.report_file = refile
+        ax.clear()
+        ax.set_yscale("log")
 
-        def animate(i):
-            ax.clear()
-            ax.set_yscale("log")
+        ax.set_xlabel("cycles")
+        ax.set_ylabel("RMS residual")
 
-            ax.set_xlabel("cycles")
-            ax.set_ylabel("RMS residual")
+        ax.set_title(self.control_file_stem)
 
-            self.append_index = 0
-            if not isinstance(self.report_file, list):
-                report_file_list = [self.report_file]
-                ax.set_title(self.report_file[: self.report_file.rindex("_report.csv")])
-            else:
-                report_file_list = self.report_file
-                if len(report_file_list) > 1:
-                    self.append_index = 1
+        # y = self.residual_list
+        x = "Cycle"
 
-            for report_file in report_file_list:
-                if not os.path.isfile(self.report_file):
-                    print("File not found: " + str(self.report_file))
-                    continue
+        for y in self.report.residual_list:
+            self.report.data.plot(x=x, y=y, ax=ax, legend=False)
 
-                self.read_data(self.report_file)
+        # Turn on major and minor grid lines
+        ax.grid(True, "both")
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        plt.legend(loc="center left", bbox_to_anchor=(1.0, 0.5))
 
-                # y = self.residual_list
-                x = "Cycle"
-                if self.append_index > 0:
-                    x = x + "_" + str(self.append_index)
-                for y in self.residual_list:
-                    self.data.plot(x=x, y=y, ax=ax, legend=False)
-                self.append_index = self.append_index + 1
-
-            # Turn on major and minor grid lines
-            ax.grid(True, "both")
-            box = ax.get_position()
-            ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
-            plt.legend(loc="center left", bbox_to_anchor=(1.0, 0.5))
-
-        animate(0)
-        # if not batch:
-        #     ani = animation.FuncAnimation(fig, animate, interval=10000)
-
-        if batch:
-            fig.savefig(report_file + ".png", dpi=100)
+        if "BATCH_ANALYSIS" in os.environ:
+            fig.savefig(self.control_file_stem + "_residuals.png", dpi=100)
         plt.show()
         self.visible_fig = []
 
-    def plot_data(self, b):
-        # Delete visbible figures
-        # for f in self.visible_fig:
-        #    f.clear()
-        #    plt.close(f)
-        #    plt.gcf()
-        # dp.clear_output(wait=True)
-        self.rolling_avg = self.rolling.value
-        self.out.clear_output()
-        with self.out:
-            rolling = self.data.rolling(self.rolling_avg).mean()
-            for cb in self.checkboxes:
-                if cb.value:
-                    h = cb.description
-                    fig = plt.figure()
-                    ax = fig.gca()
-                    y = h
-                    self.data.plot(x="Cycle", y=y, ax=ax, legend=False)
-                    rolling.plot(x="Cycle", y=y, ax=ax, legend=0)
-                    last_val = self.data[h].tail(1).values
-                    # $\downarrow$ $\uparrow$ $\leftrightarrow$
-                    rolling_grad = (
-                        rolling[h].tail(2).values[0] - rolling[h].tail(2).values[1]
-                    )
-                    trend = r"$\leftrightarrow$"
-                    if rolling_grad > 0.0:
-                        trend = r"$\downarrow$"
-                    elif rolling_grad < 0.0:
-                        trend = r"$\uparrow$"
-                    ax.set_title(str(h) + " - " + str(last_val) + " " + trend)
-                    ax.grid(True)
-                    ax.set_xlabel("cycles")
-                    ax.set_ylabel(h)
-                    self.visible_fig.append(fig)
-                    plt.show()
-            # display(plt)
-
-    def plot_forces(self, mean=20):
+    def plot_forces(self, mean: int = 20) -> None:
+        """Create a checkbox widget to plot force and monitor data from a zCFD report file"""
         # Need to disable autoscroll
         # autoscroll(-1)
 
         self.rolling_avg = mean
 
-        if self.header_list is None:
+        if self.report.header_list is None:
             return
 
         if self.cb_container is None:
             self.out = widgets.Output()
             self.checkboxes = []
             self.cb_container = widgets.VBox()
-            for h in self.header_list:
-                if h not in self.residual_list and h not in ["RealTimeStep", "Cycle"]:
+            for h in self.report.header_list:
+                if h not in self.report.residual_list and h not in [
+                    "RealTimeStep",
+                    "Cycle",
+                ]:
                     self.checkboxes.append(
                         widgets.Checkbox(description=h, value=False, width=90)
                     )
@@ -256,29 +195,155 @@ class Report(object):
         display(self.rolling)
         display(self.button)
 
-    def plot_performance(self, log_file):
-        if not os.path.isfile(log_file):
-            print("File not found: " + str(log_file))
-            return
+    def plot_data(self, _) -> None:
+        """Plot data from checked boxes in the plot_forces widget"""
+        self.rolling_avg = self.rolling.value
+        self.out.clear_output()
+        with self.out:
+            rolling = self.report.data.rolling(self.rolling_avg).mean()
+            for cb in self.checkboxes:
+                if cb.value:
+                    h = cb.description
+                    fig = plt.figure()
+                    ax = fig.gca()
+                    y = h
+                    self.report.data.plot(x="Cycle", y=y, ax=ax, legend=False)
+                    rolling.plot(x="Cycle", y=y, ax=ax, legend=False)
+                    last_val = self.report.data[h].tail(1).values
+                    # $\downarrow$ $\uparrow$ $\leftrightarrow$
+                    rolling_grad = (
+                        rolling[h].tail(2).values[0] - rolling[h].tail(2).values[1]
+                    )
+                    trend = r"$\leftrightarrow$"
+                    if rolling_grad > 0.0:
+                        trend = r"$\downarrow$"
+                    elif rolling_grad < 0.0:
+                        trend = r"$\uparrow$"
+                    ax.set_title(str(h) + " - " + str(last_val) + " " + trend)
+                    ax.grid(True)
+                    ax.set_xlabel("cycles")
+                    ax.set_ylabel(h)
+                    self.visible_fig.append(fig)
+                    plt.show()
 
-        elapsed_time = []
-        import re
+    def plot_performance(self, log_file_path: Optional[str] = None) -> None:
+        """Plot CFD solver performance from a zCFD log file"""
 
-        with open(log_file) as lfile:
-            for line in lfile:
-                line = re.findall(r"Timer: Elapsed seconds: [0-9.]+", line)
-                if line:
-                    line = line[0].split(":")[2]
-                    elapsed_time.append(float(line))
+        if log_file_path:
+            print(
+                "plot_performance(log_file_path) function is deprecated, use plot_performance() instead"
+            )
+            warnings.warn(
+                "plot_performance(log_file_path) function is deprecated, use plot_performance() instead",
+                DeprecationWarning,
+            )
 
-        df = pd.DataFrame(elapsed_time)
+        _performance_plot(self.log_file_path)
+
+        try:
+            self.plot_linear_solve_memory_usage()
+        except Exception as e:
+            print("Error plotting AMGX memory usage: " + str(e))
+
+    def plot_linear_solve_memory_usage(self) -> None:
+        """Plots the linear solver usage from all zCFD log file ranks"""
+        # figure out the number of ranks
+        memory_usage = []
+
+        for rank_log in self.rank_report_paths:
+            memory_usage.append(_get_linear_solve_memory_usage_from_file(rank_log))
 
         fig = plt.figure(figsize=(8, 5), dpi=100)
         ax = fig.gca()
         ax.grid(True)
-        ax.set_xlabel("cycles")
-        ax.set_ylabel("Cycle Elapsed time (secs)")
-        df.plot(ax=ax, legend=False)
-        if batch:
-            fig.savefig(log_file + ".png", dpi=100)
+        ax.set_xlabel("Cycle")
+        ax.set_ylabel("AMGX memory usage (MB)")
+        ax.set_title("AMGX Memory Usage for case {}".format(self.control_file_stem))
+
+        for ii, rank_memory_usage in enumerate(memory_usage):
+            ax.plot(rank_memory_usage)
+            if len(rank_memory_usage) > 0:
+                ax.plot(rank_memory_usage, label="Rank {}".format(ii))
+                if "BATCH_ANALYSIS" in os.environ:
+                    fig.savefig(self.control_file_stem + "_memory_usage.png", dpi=100)
+                ax.annotate(
+                    "Rank {}".format(ii),
+                    (len(rank_memory_usage) - 1, rank_memory_usage[-1]),
+                    textcoords="offset points",
+                    xytext=(20, 0),
+                    ha="center",
+                )
+            else:
+                print(
+                    "No amgx memory usage data found in log file: {}".format(
+                        self.rank_report_paths[ii]
+                    )
+                )
+
+        ax.set_xlim(ax.get_xlim()[0], ax.get_xlim()[1] * 1.1)
+
+        # ax.legend(loc="upper right")
         plt.show()
+
+
+def _performance_plot(fname: str) -> None:
+    if not os.path.isfile(fname):
+        print("File not found: " + str(fname))
+        return
+
+    elapsed_time = []
+
+    with open(fname) as lfile:
+        for line in lfile:
+            line = re.findall(r"Timer: Elapsed seconds: [0-9.]+", line)
+            if line:
+                line = line[0].split(":")[2]
+                elapsed_time.append(float(line))
+
+    df = pd.DataFrame(elapsed_time)
+
+    fig = plt.figure(figsize=(8, 5), dpi=100)
+    ax = fig.gca()
+    ax.grid(True)
+    ax.set_xlabel("cycles")
+    ax.set_ylabel("Cycle Elapsed time (secs)")
+    df.plot(ax=ax, legend=False)
+    if "BATCH_ANALYSIS" in os.environ:
+        fig.savefig(fname + ".png", dpi=100)
+    plt.show()
+
+
+def _get_linear_solve_memory_usage_from_file(log_file: str) -> list:
+    """Extract linear solver memory usage from zCFD log file"""
+    if not os.path.isfile(log_file):
+        print("File not found: " + str(log_file))
+        return []
+
+    memory_usage = []
+
+    with open(log_file, "r") as f:
+        lines = f.readlines()
+        memory_pattern = re.compile(
+            r"Maximum\s+Memory\s+Usage:\s+(\d+(?:\.\d+)?)(\s*(MB|GB|KB))"
+        )
+        memory_usage = []
+        for line in lines:
+            match = memory_pattern.search(line)
+            if match:
+                memory_info = {"value": match.group(1), "unit": match.group(3)}
+                memory_usage.append(memory_info)
+
+    main_solve_memory_usage = []
+
+    for ii, memory_info in enumerate(memory_usage):
+        # extract every other value
+        if ii % 2 == 0:
+            value = float(memory_info["value"])
+            unit = memory_info["unit"]
+            if unit == "KB":
+                value *= 1e-3
+            elif unit == "GB":
+                value *= 1e3
+            main_solve_memory_usage.append(value)
+
+    return main_solve_memory_usage

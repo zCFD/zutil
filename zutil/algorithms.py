@@ -24,59 +24,55 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Module init for plot functions- determines paraview compatibility and sets out which rendering engine should be used"""
+Useful algorithms
+"""
 
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.rcsetup import all_backends
-
-import paraview as pv
-import paraview.simple as pvs
-
-import os
-
-# Configure rendering for remote or interactive widgets
-if "BATCH_ANALYSIS" in os.environ:
-    batch = True
-else:
-    batch = False
-
-# https://matplotlib.org/stable/users/explain/figure/backends.html
-
-matplotlib.rcParams.update({"backend_fallback": False})
-matplotlib.rcParams.update({"figure.max_open_warning": 0})
+from typing import Callable
+import numpy as np
 
 
-if batch:
-    # Script mode- don't render figures in interactive widgets
-    if "Agg" in all_backends:
-        matplotlib.use("Agg")
-    else:
-        matplotlib.use("agg")
-    plt.ioff()
-else:
-    # Interactive mode- use nbAgg backend
-    matplotlib.use("module://ipympl.backend_nbagg")
-    plt.ion()
+def gss(f: Callable, a: float, b: float, tol: float = 1e-5) -> tuple[float, float]:
+    """
+    Golden section search:
 
-# To run scripts written for ParaView 4.0 in newer versions, you can use the following.
+    Given a function `f` with a single local maximum in the interval `[a, b]`,
+    returns an interval `[c, d]` containing the maximum with a width `d - c <= tol`.
 
-pv.compatibility.major = 5
-pv.compatibility.minor = 4
+    Args:
+        f: The function to optimize (callable).
+        a: The lower bound of the initial interval.
+        b: The upper bound of the initial interval.
+        tol: The desired tolerance (default: 1e-5).
 
-pvs._DisableFirstRenderCameraReset()
+    Returns:
+        A tuple (c, d) representing the final interval containing the maximum.
+    """
 
-# Messy, but ensures compatibility with exisiting test harness structure for now
-from .zplot import get_figure
-from .zplot import x_label
-from .zplot import y_label
-from .zplot import set_title
-from .zplot import set_suptitle
-from .zplot import set_legend
-from .zplot import set_ticks
+    golden_ratio = (np.sqrt(5) + 1) / 2  # phi
+    golden_ratio_conjugate = 1 - golden_ratio  # 1 - phi
 
-from .plot_report import Report
-from .plot_report import zCFD_Plots
+    (a, b) = (min(a, b), max(a, b))  # Ensure a <= b
+    h = b - a
 
-from . import font as ft
-from . import colour as cl
+    if h <= tol:
+        return (a, b)
+
+    n = int(
+        np.ceil(np.log(tol / h) / np.log(golden_ratio_conjugate))
+    )  # Calculate iterations
+    c = b - golden_ratio_conjugate * h  # Initial interior points
+    d = a + golden_ratio_conjugate * h
+
+    for _ in range(n - 1):
+        if f(c) > f(d):
+            b = d
+            d = c
+            h = golden_ratio_conjugate * h
+            c = b - golden_ratio_conjugate * h
+        else:
+            a = c
+            c = d
+            h = golden_ratio_conjugate * h
+            d = a + golden_ratio_conjugate * h
+
+    return (a, d) if f(c) > f(d) else (c, b)  # Return final interval

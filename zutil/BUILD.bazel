@@ -1,0 +1,21 @@
+# introduced this so that
+# can import zutil into fwh for run_fwh
+# this is just the bare amount so that we can read parameters files which include zutil
+load("@zdeps//:requirements.bzl", "requirement")
+
+#importable
+py_library(
+    name = "zutil",
+    srcs = [
+        "__init__.py",
+        "algorithms.py",
+        "converters.py",
+        "fileutils.py",
+    ],
+    imports = ["."],
+    visibility = ["//zutil:__pkg__"],
+    deps = [
+        requirement("numpy"),
+        requirement("pandas"),
+    ],
+)

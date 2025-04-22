@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2017, Zenotech Ltd
+Copyright (c) 2012-2024, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -26,54 +26,69 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 """
 
 
-from past.utils import old_div
 import math
 import numpy as np
+from typing import Union
 
 
-def coriolis_parameter(latitude_degree):
+def coriolis_parameter(latitude_degree: float) -> float:
     """
-    return the coriolis parameter
+    Return the coriolis parameter
     """
     # Earth rotation
     omega = 7.2722e-5  # rad/self
     return 2.0 * omega * math.sin(math.radians(latitude_degree))
 
 
-def ekman_layer_height(friction_velocity, coriolis_parameter):
+def ekman_layer_height(friction_velocity: float, coriolis_parameter: float) -> float:
     """
-    returns the height of the atmospheric boundary layer - Geostrophic height
-    For neutral conditions this is the height of the ABL
+    Returns the height of the atmospheric boundary layer - Geostrophic height
+    for neutral conditions this is the height of the ABL
     """
     return friction_velocity / (6.0 * coriolis_parameter)
 
 
-def friction_velocity(wind_speed, height, roughness_length, kappa=0.41):
+def friction_velocity(
+    wind_speed: Union[float, int],
+    height: Union[float, int],
+    roughness_length: float,
+    kappa: float = 0.41,
+) -> float:
     """
-    returns the friction velocity
+    Returns the friction velocity
     """
     return wind_speed * kappa / math.log(height / roughness_length)
 
 
-def wind_speed(height, friction_velocity, roughness_length, kappa=0.41):
+def wind_speed(
+    height: Union[float, int],
+    friction_velocity: Union[float, int],
+    roughness_length: Union[float, int],
+    kappa: float = 0.41,
+) -> float:
     """
-    returns the wind speed at a given height
+    Returns the wind speed at a given height
 
     May want to consider Deaves & Harris (1978) model for high speed wind
     """
     return friction_velocity / kappa * math.log(height / roughness_length)
 
 
-def wind_speed_array(height_array, friction_velocity, roughness_length, kappa=0.41):
+def wind_speed_array(
+    height_array: np.array,
+    friction_velocity: Union[float, int],
+    roughness_length: Union[float, int],
+    kappa: float = 0.41,
+) -> np.array:
     """
-    returns the wind speed at a given height
+    Returns the wind speed at a given height
 
     May want to consider Deaves & Harris (1978) model for high speed wind
     """
     return friction_velocity / kappa * np.log((height_array / roughness_length))
 
 
-def wind_direction_to_beta(wind_dir_deg):
+def wind_direction_to_beta(wind_dir_deg: float) -> float:
     """
     Beta = 0.0 -> [1.0,0.0,0.0]
     Wind = 0.0 -> [0.0,-1.0,0.0]
@@ -83,14 +98,16 @@ def wind_direction_to_beta(wind_dir_deg):
     return 360.0 - (wind_dir_deg + 90.0)
 
 
-def vel_to_vxy(vel):
+def vel_to_vxy(vel: Union[list, tuple]) -> float:
     """
     Speed of wind in xy plane
+
+    vel = Velocity vector
     """
     return math.sqrt(vel[0] * vel[0] + vel[1] * vel[1])
 
 
-def vel_to_vxy_dir(vel):
+def vel_to_vxy_dir(vel: list) -> float:
     """
     Direction of wind in xy plane
     """
@@ -100,7 +117,7 @@ def vel_to_vxy_dir(vel):
     return vxy_dir
 
 
-def vel_to_upflow(vel):
+def vel_to_upflow(vel: list) -> float:
     """
     Wind upflow angle
     """

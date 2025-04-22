@@ -1,51 +1,103 @@
-""" Helper functions for accessing Paraview functionality
-.. moduleauthor:: Zenotech Ltd
+"""
+Copyright (c) 2012-2024, Zenotech Ltd
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+    * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+    * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+    * Neither the name of Zenotech Ltd nor the
+      names of its contributors may be used to endorse or promote products
+      derived from this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL ZENOTECH LTD BE LIABLE FOR ANY
+DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
+ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+Helper functions for accessing zCFD Paraview functionality
 """
 
-
 from tqdm import tqdm
-from IPython.display import HTML, Javascript, display
-import uuid
-import csv
 from zutil import analysis
-import time
-import math
-from zutil import mag
 import json
-from zutil import rotate_vector
-from paraview.simple import *
+
+import paraview.simple as pvs
 from builtins import object
-from past.utils import old_div
 from builtins import range
 from builtins import str
 from future import standard_library
+from typing import Union, Tuple, Optional
+import os
+from zutil.fileutils import clean_name
+from zutil.fileutils import get_csv_data
+import pandas as pd
+from pathlib import Path
+import matplotlib.image as image
+from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 
 standard_library.install_aliases()
 # from paraview.vtk.util import numpy_support
 try:
-    from paraview.vtk.dataset_adapter import numpyTovtkDataArray
     from paraview.vtk.dataset_adapter import Table
-    from paraview.vtk.dataset_adapter import PolyData
-    from paraview.vtk.dataset_adapter import DataSetAttributes
     from paraview.vtk.dataset_adapter import DataSet
-    from paraview.vtk.dataset_adapter import CompositeDataSet
     from paraview.vtk.dataset_adapter import PointSet
-except:
-    from paraview.vtk.numpy_interface.dataset_adapter import numpyTovtkDataArray
+except ImportError:
     from paraview.vtk.numpy_interface.dataset_adapter import Table
-    from paraview.vtk.numpy_interface.dataset_adapter import PolyData
-    from paraview.vtk.numpy_interface.dataset_adapter import DataSetAttributes
     from paraview.vtk.numpy_interface.dataset_adapter import DataSet
-    from paraview.vtk.numpy_interface.dataset_adapter import CompositeDataSet
     from paraview.vtk.numpy_interface.dataset_adapter import PointSet
 
 
-def sum_and_zone_filter_array(input, array_name, ignore_zone, filter=None):
+def get_data_array_and_zone(input, array_name, cell_data):
+    """"""
+    if cell_data:
+        p = input.GetCellData().GetArray(array_name)
+        z = input.GetCellData().GetArray("zone")
+        n = input.GetNumberOfCells()
+    else:
+        # check if requested data array excists in point data
+        p = input.GetPointData().GetArray(array_name)
+        z = input.GetPointData().GetArray("zone")
+        n = input.GetNumberOfPoints()
+
+    return p, z, n
+
+
+def _call_extract(source, proxy, array_name, ignore_zone, filter):
+    if array_name in source.CellData.keys():
+        extract = sum_and_zone_filter(
+            proxy, array_name, ignore_zone, filter, cell_data=True
+        )
+    elif array_name in source.PointData.keys():
+        extract = sum_and_zone_filter(
+            proxy, array_name, ignore_zone, filter, cell_data=False
+        )
+    else:
+        print("Error: {} variable not found in input".format(array_name))
+        extract = [0.0, 0.0, 0.0]
+    return extract
+
+
+def sum_and_zone_filter_array(
+    input: any, array_name: str, ignore_zone: list, filter: any = None, cell_data=True
+) -> list:
+    """Take an array data set and sum the values in the valid regions as specified through the filters"""
+
     sum = [0.0, 0.0, 0.0]
-    p = input.GetCellData().GetArray(array_name)
-    z = input.GetCellData().GetArray("zone")
-    numCells = input.GetNumberOfCells()
-    for x in range(numCells):
+    # check if requested data array exists in cell data:
+    p, z, num_locations = get_data_array_and_zone(input, array_name, cell_data)
+
+    for x in range(num_locations):
         if len(ignore_zone) == 0:
             v = p.GetTuple(x)
             for i in range(0, 3):
@@ -61,7 +113,10 @@ def sum_and_zone_filter_array(input, array_name, ignore_zone, filter=None):
     return sum
 
 
-def sum_and_zone_filter(input, array_name, ignore_zone, filter=None):
+def sum_and_zone_filter(
+    input: any, array_name: str, ignore_zone: list, filter: any = None, cell_data=True
+) -> list:
+    """Break down vtkMultiBlockDataSet object and sum desired arrays according to filters"""
     sum = [0.0, 0.0, 0.0]
     if input.IsA("vtkMultiBlockDataSet"):
         iter = input.NewIterator()
@@ -69,23 +124,29 @@ def sum_and_zone_filter(input, array_name, ignore_zone, filter=None):
         iter.InitTraversal()
         while not iter.IsDoneWithTraversal():
             cur_input = iter.GetCurrentDataObject()
-            v = sum_and_zone_filter_array(cur_input, array_name, ignore_zone, filter)
+            v = sum_and_zone_filter_array(
+                cur_input, array_name, ignore_zone, filter, cell_data
+            )
             for i in range(0, 3):
                 sum[i] += v[i]
             iter.GoToNextItem()
     else:
-        sum = sum_and_zone_filter_array(input, array_name, ignore_zone, filter)
+        sum = sum_and_zone_filter_array(
+            input, array_name, ignore_zone, filter, cell_data
+        )
 
     return sum
 
 
 class GeomFilterLT(object):
-    def __init__(self, val, idx):
-        #
+    '''Geometric filter, which tests whether an input (x,y,z)[idx] is less than a float "val"'''
+
+    def __init__(self, val: int, idx: int) -> None:
         self.val = val
         self.idx = idx
 
-    def test(self, input, x):
+    def test(self, input: any, x: int) -> bool:
+        """Returns True if the (x,y,z)[idx] value is less than the filter threshold value"""
         centre = input.GetCellData().GetArray("centre").GetTuple(x)
         if centre[self.idx] < self.val:
             return True
@@ -94,12 +155,15 @@ class GeomFilterLT(object):
 
 
 class GeomFilterGT(object):
-    def __init__(self, val, idx):
+    '''Geometric filter, which tests whether an input (x,y,z)[idx] is greater than a float "val"'''
+
+    def __init__(self, val: float, idx: int) -> None:
         #
         self.val = val
         self.idx = idx
 
-    def test(self, input, x):
+    def test(self, input: any, x: int) -> bool:
+        """Returns True if the (x,y,z)[idx] value is greater than the filter threshold value"""
         centre = input.GetCellData().GetArray("centre").GetTuple(x)
         if centre[self.idx] >= self.val:
             return True
@@ -107,10 +171,43 @@ class GeomFilterGT(object):
             return False
 
 
-def calc_force_from_file(
-    file_name, ignore_zone, half_model=False, filter=None, **kwargs
+def clean_vtk(
+    vtk_object: object, cellDataToPointData: bool = True, mergeBlocks: bool = True
 ):
-    """Calculates the pressure and friction force
+    """Takes a VTK object, and performs basic cleanup operations:
+    cleanToGrid
+    mergeBlocks [optional]
+    cellDataToPointData [optional]
+
+    Args:
+        vtk_object: A loaded vtk object
+    Optional:
+        mergeBlocks: default=True-Whether to perform a mergeBlocks operation on the data
+        cellDataToPointData: defult=True- Whether to perform a cellDataToPointData mapping on the object
+    """
+    data = pvs.CleantoGrid(Input=vtk_object)
+
+    if mergeBlocks:
+        data = pvs.MergeBlocks(Input=data)
+        pvs.UpdatePipeline()
+
+    if cellDataToPointData:
+        data = pvs.CellDatatoPointData(Input=data)
+        data.ProcessAllArrays = 1
+        data.PassCellData = 1
+        pvs.UpdatePipeline()
+
+    return data
+
+
+def calc_force_from_file(
+    file_name: str,
+    ignore_zone: list,
+    half_model: bool = False,
+    filter: any = None,
+    **kwargs,
+) -> Tuple[float, float]:
+    """Calculate the pressure and friction force
 
     This function requires that the VTK file contains three cell data arrays
     called pressureforce, frictionforce and zone
@@ -121,42 +218,157 @@ def calc_force_from_file(
 
     Kwargs:
         half_nodel (bool): Does the data represent only half of the model
-        filter (function):
+        filter (function): GeomFilter object
 
     Returns:
         float, float. pressure force and friction force
     """
-    wall = PVDReader(FileName=file_name)
+    wall = pvs.PVDReader(FileName=file_name)
     wall.UpdatePipeline()
 
     return calc_force(wall, ignore_zone, half_model, filter, kwargs)
 
 
-def calc_force_wall(file_root, ignore_zone, half_model=False, filter=None, **kwargs):
-    wall = PVDReader(FileName=file_root + "_wall.pvd")
+def calc_force_wall(
+    file_root: str,
+    ignore_zone: list,
+    half_model: bool = False,
+    filter: any = None,
+    **kwargs,
+) -> Tuple[float, float]:
+    """Calculate pressure and friction forces at wall"""
+
+    wall = pvs.PVDReader(FileName=file_root + "_wall.pvd")
     wall.UpdatePipeline()
 
     force = calc_force(wall, ignore_zone, half_model, filter, **kwargs)
-    Delete(wall)
+    pvs.Delete(wall)
     del wall
     return force
 
 
-def calc_force(surface_data, ignore_zone, half_model=False, filter=None, **kwargs):
-    alpha = 0.0
-    if "alpha" in kwargs:
-        alpha = kwargs["alpha"]
-    beta = 0.0
-    if "beta" in kwargs:
-        beta = kwargs["beta"]
+def _get_logo_path(strapline=False):
+    zcfd_home = Path(__file__).parents[5]
+    if strapline:
+        logo = "ZCFD_Mark_CMYK.png"
+    else:
+        logo = "ZCFD_Mark_CMYK_No_Strapline_trans.png"
+    file_loc = zcfd_home / "share" / "assets" / logo
+    return str(file_loc)
 
-    sum_client = servermanager.Fetch(surface_data)
 
-    pforce = sum_and_zone_filter(sum_client, "pressureforce", ignore_zone, filter)
-    fforce = sum_and_zone_filter(sum_client, "frictionforce", ignore_zone, filter)
+def vtk_logo_stamp(
+    input: any, location="Upper Left Corner", logo_file=None, strapline=False
+):
+    """stamps a render view with a zcfd logo
+    Inputs:
+    input: paraview render view object
+    Optional:
+    location: str (default="Upper Left Corner") location of the logo
+    logo_file: str (default=None) optional string to alternative logo file
+    strapline: bool (default=False) whether to include the strapline in the logo"""
+    logo1 = pvs.Logo()
 
-    pforce = rotate_vector(pforce, alpha, beta)
-    fforce = rotate_vector(fforce, alpha, beta)
+    # get the logo file
+    if logo_file:
+        logo_path = logo_file
+    else:
+        logo_path = _get_logo_path(strapline)
+
+    logo_texture = pvs.CreateTexture(logo_path)
+    logo1.Texture = logo_texture
+    logoDisplay = pvs.Show(logo1, input)
+    logoDisplay.WindowLocation = location
+    # TODO: Add the ability to adjust the logo size with paraview 13
+
+    return logoDisplay
+
+
+def vtk_text_stamp(
+    input: any,
+    text_str: str,
+    fontsize=40,
+    color=[1.0, 1.0, 1.0],
+    location="Lower Left Corner",
+    bold=False,
+    justification=None,
+    font="Courier",
+):
+    """stamps a renderview object with a text string
+    Inputs:
+    input: paraview render view object
+    text_str: str text to be displayed
+    Optional:
+    fontsize: int (default=40) font size
+    color: list (default=[1.0,1.0,1.0]) RGB color
+    location: str (default="Lower Left Corner") location of the text
+    bold: bool (default=False) whether the text is bold
+    justification: str (default=None) justification of the text- by default it is set by the location
+    font: str (default="Courier") font family
+    """
+    text = pvs.Text()
+    text.Text = text_str
+    textDisplay = pvs.Show(text, input)
+    textDisplay.FontSize = fontsize
+    textDisplay.Color = color
+    textDisplay.Bold = int(bold)
+    textDisplay.WindowLocation = location
+    textDisplay.FontFamily = font
+    if justification:
+        textDisplay.Justification = justification
+    else:
+        textDisplay.Justification = location.split(" ")[1]
+    return textDisplay
+
+
+def plt_logo_stamp(ax, location=(0.9, 0.95), logo_file=None, strapline=False):
+    """stamps a matplotlib plot with a zCFD logo
+    Inputs:
+    ax: matplotlib axis object
+    Optional:
+    location: tuple (default=(0.9,0.95)) location of the logo as a % of x and y axis position
+    logo_file: str (default=None) optional string to alternative logo file
+    strapline: bool (default=False) whether to include the strapline in the logo
+    """
+    if logo_file:
+        logo_path = logo_file
+    else:
+        logo_path = _get_logo_path(strapline)
+    logo = image.imread(logo_path)
+
+    imagebox = OffsetImage(logo, zoom=0.25)
+    ab = AnnotationBbox(imagebox, xy=location, xycoords="axes fraction", frameon=False)
+    ax.add_artist(ab)
+
+    return ax
+
+
+def calc_force(
+    surface_data: any,
+    ignore_zone: list = [],
+    half_model: bool = False,
+    filter: any = None,
+    **kwargs,
+) -> Tuple[float, float]:
+    """Calculate forces from a surface file
+
+    Inputs:
+    surface_data: VTKPointData object
+
+    Optional:
+    ignore_zones: list (default = [])
+    half_model: bool (default = False)
+    filter: callable (default = None)
+    """
+
+    sum_client = pvs.servermanager.Fetch(surface_data)
+
+    pforce = _call_extract(
+        surface_data, sum_client, "pressureforce", ignore_zone, filter
+    )
+    fforce = _call_extract(
+        surface_data, sum_client, "frictionforce", ignore_zone, filter
+    )
 
     if half_model:
         for i in range(0, 3):
@@ -168,73 +380,76 @@ def calc_force(surface_data, ignore_zone, half_model=False, filter=None, **kwarg
     return pforce, fforce
 
 
-def calc_moment_wall(file_root, ignore_zone, half_model=False, filter=None, **kwargs):
-    wall = PVDReader(FileName=file_root + "_wall.pvd")
+def calc_moment_wall(
+    file_root: str,
+    ignore_zone: list,
+    half_model: bool = False,
+    filter: any = None,
+    **kwargs,
+) -> Tuple[float, float]:
+    """Calculate the pressure and friction moment
+
+    This function requires that the _wall.pvd file contains three cell data arrays
+    called pressuremomentx, frictionmomentx and zone
+
+    Args:
+        file_name (str): the VTK file name including path
+        ignore_zone (list): List of zones to be ignored
+
+    Kwargs:
+        half_nodel (bool): Does the data represent only half of the model
+        filter (function): GeomFilter object
+
+    Returns:
+        float, float. pressure force and friction force
+    """
+    wall = pvs.PVDReader(FileName=file_root + "_wall.pvd")
     wall.UpdatePipeline()
 
     moment = calc_moment(wall, ignore_zone, half_model, filter, **kwargs)
-    Delete(wall)
+    pvs.Delete(wall)
     del wall
     return moment
 
 
-def calc_moment(surface_data, ignore_zone, half_model=False, filter=None, **kwargs):
-    alpha = 0.0
-    if "alpha" in kwargs:
-        alpha = kwargs["alpha"]
-    beta = 0.0
-    if "beta" in kwargs:
-        beta = kwargs["beta"]
+def calc_moment(
+    surface_data: any,
+    ignore_zone: list = [],
+    half_model: bool = False,
+    filter: any = None,
+    **kwargs,
+) -> Tuple[float, float]:
+    """Akin to zutil.post.calc_force: Function called by .calc_moment_wall"""
 
     if "ref_pt" in kwargs:
-        sum_client = servermanager.Fetch(surface_data)
-        if sum_client.GetCellData().GetArray("pressuremomentx"):
-            pmoment = sum_and_zone_filter(
-                sum_client, "pressuremomentx", ignore_zone, filter
-            )
-            fmoment = sum_and_zone_filter(
-                sum_client, "frictionmomentx", ignore_zone, filter
-            )
-
-            pmoment = rotate_vector(pmoment, alpha, beta)
-            fmoment = rotate_vector(fmoment, alpha, beta)
-            # fforce = rotate_vector(fforce,alpha,beta)
-
-            if half_model:
-                # This is only valid for X-Z plane reflection
-                pmoment[0] += -pmoment[0]
-                pmoment[1] += pmoment[1]
-                pmoment[2] += -pmoment[2]
-
-                fmoment[0] += -fmoment[0]
-                fmoment[1] += fmoment[1]
-                fmoment[2] += -fmoment[2]
-
-            return pmoment, fmoment
-
+        p_metric = "pressuremomentx"
+        f_metric = "frictionmomentx"
     else:
-        sum_client = servermanager.Fetch(surface_data)
-        pmoment = sum_and_zone_filter(sum_client, "pressuremoment", ignore_zone, filter)
-        fmoment = sum_and_zone_filter(sum_client, "frictionmoment", ignore_zone, filter)
+        p_metric = "pressuremoment"
+        f_metric = "frictionmoment"
 
-        pmoment = rotate_vector(pmoment, alpha, beta)
-        fmoment = rotate_vector(fmoment, alpha, beta)
-        # fforce = rotate_vector(fforce,alpha,beta)
+    sum_client = pvs.servermanager.Fetch(surface_data)
 
-        if half_model:
-            # This is only valid for X-Z plane reflection
-            pmoment[0] += -pmoment[0]
-            pmoment[1] += pmoment[1]
-            pmoment[2] += -pmoment[2]
+    pmoment = _call_extract(surface_data, sum_client, p_metric, ignore_zone, filter)
+    fmoment = _call_extract(surface_data, sum_client, f_metric, ignore_zone, filter)
 
-            fmoment[0] += -fmoment[0]
-            fmoment[1] += fmoment[1]
-            fmoment[2] += -fmoment[2]
+    if half_model:
+        # This is only valid for X-Z plane reflection
+        pmoment[0] += -pmoment[0]
+        pmoment[1] += pmoment[1]
+        pmoment[2] += -pmoment[2]
 
-        return pmoment, fmoment
+        fmoment[0] += -fmoment[0]
+        fmoment[1] += fmoment[1]
+        fmoment[2] += -fmoment[2]
+
+    return pmoment, fmoment
 
 
-def calc_lift_centre_of_action(force, moment, ref_point):
+def calc_lift_centre_of_action(
+    force: Union[list, tuple], moment: Union[list, tuple], ref_point: Union[list, tuple]
+) -> Tuple[tuple, float]:
+    """Calculate centre of action of lift given a force, moement and reference point"""
     # longitudinal centre xs0 at zs0
     # spanwise centre ys0 at zs0
     # residual Mz moment (Mx=My=0) mzs0
@@ -248,7 +463,11 @@ def calc_lift_centre_of_action(force, moment, ref_point):
     return (xs0, ys0, zs0), mzs0
 
 
-def calc_drag_centre_of_action(force, moment, ref_point):
+def calc_drag_centre_of_action(
+    force: Union[list, tuple], moment: Union[list, tuple], ref_point: Union[list, tuple]
+) -> Tuple[tuple, float]:
+    """Calculate centre of action of drag given a force, moement and reference point"""
+
     # longitudinal centre xs0 at zs0
     # spanwise centre ys0 at zs0
     # residual Mz moment (Mx=My=0) mzs0
@@ -263,11 +482,7 @@ def calc_drag_centre_of_action(force, moment, ref_point):
     return (xs0, ys0, zs0), mzs0
 
 
-def move_moment_ref_point(moment, ref_point, new_ref_point):
-    pass
-
-
-def get_span(wall):
+def get_span(wall: any) -> Tuple[float, float]:
     """Returns the min and max y ordinate
 
     Args:
@@ -276,37 +491,16 @@ def get_span(wall):
     Returns:
         (float,float). Min y, Max y
     """
-    Calculator1 = Calculator(Input=wall)
+    bounds = wall.GetDataInformation().GetBounds()
+    y_min = bounds[2]
+    y_max = bounds[3]
 
-    Calculator1.AttributeType = "Point Data"
-    Calculator1.Function = "coords.jHat"
-    Calculator1.ResultArrayName = "ypos"
-    Calculator1.UpdatePipeline()
-
-    ymin = MinMax(Input=Calculator1)
-    ymin.Operation = "MIN"
-    ymin.UpdatePipeline()
-
-    ymin_client = servermanager.Fetch(ymin)
-
-    min_pos = ymin_client.GetPointData().GetArray("ypos").GetValue(0)
-
-    ymax = MinMax(Input=Calculator1)
-    ymax.Operation = "MAX"
-    ymax.UpdatePipeline()
-
-    ymax_client = servermanager.Fetch(ymax)
-
-    max_pos = ymax_client.GetPointData().GetArray("ypos").GetValue(0)
-
-    Delete(ymin)
-    Delete(ymax)
-    Delete(Calculator1)
-
-    return [min_pos, max_pos]
+    return y_min, y_max
 
 
-def get_chord(slice, rotate_geometry=[0.0, 0.0, 0.0]):
+def get_chord(
+    slice: any,
+) -> Tuple[float, float]:
     """Returns the min and max x ordinate
 
     Args:
@@ -315,155 +509,33 @@ def get_chord(slice, rotate_geometry=[0.0, 0.0, 0.0]):
     Returns:
         (float,float). Min x, Max x
     """
+    bounds = slice.GetDataInformation().GetBounds()
+    x_min = bounds[0]
+    x_max = bounds[1]
 
-    transform = Transform(Input=slice, Transform="Transform")
-    transform.Transform.Scale = [1.0, 1.0, 1.0]
-    transform.Transform.Translate = [0.0, 0.0, 0.0]
-    transform.Transform.Rotate = rotate_geometry
-    transform.UpdatePipeline()
-
-    Calculator1 = Calculator(Input=transform)
-
-    Calculator1.AttributeType = "Point Data"
-    Calculator1.Function = "coords.iHat"
-    Calculator1.ResultArrayName = "xpos"
-    Calculator1.UpdatePipeline()
-
-    xmin = MinMax(Input=Calculator1)
-    xmin.Operation = "MIN"
-    xmin.UpdatePipeline()
-
-    xmin_client = servermanager.Fetch(xmin)
-
-    min_pos = xmin_client.GetPointData().GetArray("xpos").GetValue(0)
-
-    xmax = MinMax(Input=Calculator1)
-    xmax.Operation = "MAX"
-    xmax.UpdatePipeline()
-
-    xmax_client = servermanager.Fetch(xmax)
-
-    max_pos = xmax_client.GetPointData().GetArray("xpos").GetValue(0)
-
-    Delete(xmin)
-    Delete(xmax)
-    Delete(Calculator1)
-    Delete(transform)
-
-    return [min_pos, max_pos]
+    return x_min, x_max
 
 
-def get_chord_spanwise(slice):
-    Calculator1 = Calculator(Input=slice)
-
-    Calculator1.AttributeType = "Point Data"
-    Calculator1.Function = "coords.jHat"
-    Calculator1.ResultArrayName = "ypos"
-    Calculator1.UpdatePipeline()
-
-    ymin = MinMax(Input=Calculator1)
-    ymin.Operation = "MIN"
-    ymin.UpdatePipeline()
-
-    ymin_client = servermanager.Fetch(ymin)
-
-    min_pos = ymin_client.GetPointData().GetArray("ypos").GetValue(0)
-
-    ymax = MinMax(Input=Calculator1)
-    ymax.Operation = "MAX"
-    ymax.UpdatePipeline()
-
-    ymax_client = servermanager.Fetch(ymax)
-
-    max_pos = ymax_client.GetPointData().GetArray("ypos").GetValue(0)
-
-    Delete(ymin)
-    Delete(ymax)
-    Delete(Calculator1)
-
-    return [min_pos, max_pos]
-
-
-def get_monitor_data(file, monitor_name, var_name):
+def get_monitor_data(file: str, monitor_name: str, var_name: str) -> tuple:
     """Return the _report file data corresponding to a monitor point and variable name"""
-    monitor = CSVReader(FileName=[file])
-    monitor.HaveHeaders = 1
-    monitor.MergeConsecutiveDelimiters = 1
-    monitor.UseStringDelimiter = 0
-    monitor.DetectNumericColumns = 1
-    monitor.FieldDelimiterCharacters = " "
-    monitor.UpdatePipeline()
-    monitor_client = servermanager.Fetch(monitor)
-    table = Table(monitor_client)
-    data = table.RowData
-    names = list(data.keys())
-    num_var = len(names) - 2
-    if str(monitor_name) + "_" + str(var_name) in names:
-        index = names.index(str(monitor_name) + "_" + str(var_name))
-        return (data[names[0]], data[names[index]])
+    df = get_csv_data(file, True)
+    names = list(df.keys())
+    variable = str(monitor_name) + "_" + str(var_name)
+    if variable in names:
+        return (df[names[0]].tolist(), df[variable].tolist())
     else:
         print(
             "POST.PY: MONITOR POINT: "
             + str(monitor_name)
             + "_"
             + str(var_name)
-            + " NOT FOUND"
+            + " NOT FOUND in "
+            + str(names)
         )
 
 
-def residual_plot(file, pl, ncol=3):
-    """Plot the _report file"""
-    from matplotlib.ticker import FormatStrFormatter
-
-    l2norm = CSVReader(FileName=[file])
-    l2norm.HaveHeaders = 1
-    l2norm.MergeConsecutiveDelimiters = 1
-    l2norm.UseStringDelimiter = 0
-    l2norm.DetectNumericColumns = 1
-    l2norm.FieldDelimiterCharacters = " "
-    l2norm.UpdatePipeline()
-
-    l2norm_client = servermanager.Fetch(l2norm)
-
-    table = Table(l2norm_client)
-
-    data = table.RowData
-
-    names = list(data.keys())
-
-    num_var = len(names) - 2
-    num_rows = (old_div((num_var - 1), ncol)) + 1
-
-    fig = pl.figure(
-        figsize=(3 * ncol, 3 * num_rows), dpi=100, facecolor="w", edgecolor="k"
-    )
-
-    # fig.suptitle(file, fontweight="bold")
-
-    i = 1
-    for var_name in names:
-        if var_name != "Cycle" and var_name != "RealTimeStep":
-            ax = fig.add_subplot(num_rows, ncol, i)
-            i = i + 1
-            if "rho" in var_name:
-                ax.set_yscale("log")
-                ax.set_ylabel("l2norm " + var_name, multialignment="center")
-            else:
-                ax.set_ylabel(var_name, multialignment="center")
-
-            ax.grid(True)
-            ax.set_xlabel("Cycles")
-            ax.tick_params(axis="both", labelsize="small")
-            # ax.ticklabel_format(axis='both', style='sci')
-            ax.yaxis.set_major_formatter(FormatStrFormatter("%.1e"))
-
-            ax.plot(data["Cycle"], data[var_name], color="r", label=var_name)
-    fig.subplots_adjust(hspace=0.5)
-    fig.subplots_adjust(wspace=0.5)
-    pl.tight_layout()
-
-
-def for_each(surface, func, **kwargs):
+def for_each(surface: any, func: any, **kwargs) -> any:
+    """Applies a function "func" to each "surface" vtkMultiBlockDataSet"""
     if surface.IsA("vtkMultiBlockDataSet"):
         iter = surface.NewIterator()
         iter.UnRegister(None)
@@ -483,408 +555,163 @@ def for_each(surface, func, **kwargs):
         func(calc, pts, **kwargs)
 
 
-def cp_profile_wall_from_file(file_root, slice_normal, slice_origin, **kwargs):
-    wall = PVDReader(FileName=file_root + "_wall.pvd")
-    clean = CleantoGrid(Input=wall)
-    clean.UpdatePipeline()
-    inp = servermanager.Fetch(clean)
-    if inp.IsA("vtkMultiBlockDataSet"):
-        inp = MergeBlocks(Input=clean)
-    else:
-        inp = clean
+def cp_profile_wall_from_file(
+    file_root: str, slice_normal: tuple, slice_origin: tuple, **kwargs
+) -> dict:
+    """Return chordwise cp profile from wall file"""
 
-    Delete(wall)
+    wall = pvs.PVDReader(FileName=file_root)
+    clean = clean_vtk(wall)
+
+    pvs.Delete(wall)
     del wall
-    profile = cp_profile(inp, slice_normal, slice_origin, **kwargs)
-    Delete(clean)
+    profile = cp_profile(clean, slice_normal, slice_origin, **kwargs)
+    pvs.Delete(clean)
     del clean
-    Delete(inp)
-    del inp
 
     return profile
 
 
-def cp_profile_wall_from_file_span(file_root, slice_normal, slice_origin, **kwargs):
-    wall = PVDReader(FileName=file_root + "_wall.pvd")
-    if "time" in kwargs:
-        wall.UpdatePipeline(kwargs["time"])
-    clean = CleantoGrid(Input=wall)
-    clean.UpdatePipeline()
-    inp = servermanager.Fetch(clean)
-    if inp.IsA("vtkMultiBlockDataSet"):
-        inp = MergeBlocks(Input=clean)
-    else:
-        inp = clean
+def slice_metric(
+    surface: any,
+    slice_normal: tuple,
+    slice_origin: tuple,
+    metric_name: str,
+    time_average: bool = False,
+    **kwargs,
+) -> dict:
+    """Calculate metric profile from a VTK surface data slice
 
-    Delete(wall)
-    del wall
-    profile = cp_profile_span(inp, slice_normal, slice_origin, **kwargs)
-    Delete(clean)
-    del clean
-    Delete(inp)
-    del inp
+    Inputs:
+    surface: VTKPointData object to take cp cut from
+    slice_normal: [nx, ny, nz] normal vector to the cut
+    slice_origin: [x, y, z] location of the slice
+    metric_name: str name of the metric to be plotted
 
-    return profile
+    Optional:
+    time_average: whether to take the time averaged solution for unsteady simulations (default=False)
 
+    Returns:
+    slice_dict: dict = {multiblockID: {"chord", "metric"}}
+    """
 
-def cp_profile(surface, slice_normal, slice_origin, **kwargs):
-    alpha = 0.0
-    if "alpha" in kwargs:
-        alpha = kwargs["alpha"]
-    beta = 0.0
-    if "beta" in kwargs:
-        beta = kwargs["beta"]
-
-    time_average = False
-    if "time_average" in kwargs:
-        time_average = kwargs["time_average"]
-
-    rotate_geometry = [0.0, 0.0, 0.0]
-    if "rotate_geometry" in kwargs:
-        rotate_geometry = kwargs["rotate_geometry"]
-
-    clean = CleantoGrid(Input=surface)
-    clean.UpdatePipeline()
-
-    point_data = CellDatatoPointData(Input=clean)
-    point_data.PassCellData = 1
-    Delete(clean)
-    del clean
-
-    if "filter" in kwargs:
-        filter_zones = kwargs["filter"]
-        calc_str = "".join("(zone={:d})|".format(i) for i in filter_zones)
-        filter_data = Calculator(Input=point_data)
-        filter_data.AttributeType = "Cell Data"
-        filter_data.Function = "if (" + calc_str[:-1] + ", 1, 0)"
-        filter_data.ResultArrayName = "zonefilter"
-        filter_data.UpdatePipeline()
-        Delete(point_data)
-        del point_data
-        point_data = Threshold(Input=filter_data)
-        point_data.Scalars = ["CELLS", "zonefilter"]
-        point_data.ThresholdRange = [1.0, 1.0]
-        point_data.UpdatePipeline()
-        Delete(filter_data)
-        del filter_data
-
-    surf = ExtractSurface(Input=point_data)
-    surf_normals = GenerateSurfaceNormals(Input=surf)
-    surf_normals.UpdatePipeline()
-
-    Delete(surf)
-    del surf
-    Delete(point_data)
-    del point_data
-
-    point_data = surf_normals
-
-    slice = Slice(Input=point_data, SliceType="Plane")
+    slice = pvs.Slice(Input=surface, SliceType="Plane")
 
     slice.SliceType.Normal = slice_normal
     slice.SliceType.Origin = slice_origin
 
     slice.UpdatePipeline()
-    Delete(point_data)
-    del point_data
 
     if time_average:
-        temporal = TemporalStatistics(Input=slice)
+        temporal = pvs.TemporalStatistics(Input=slice)
         temporal.ComputeMaximum = 0
         temporal.ComputeStandardDeviation = 0
         temporal.ComputeMinimum = 0
         temporal.UpdatePipeline()
-        Delete(slice)
+        pvs.Delete(slice)
         del slice
         slice = temporal
 
-    offset = get_chord(slice, rotate_geometry)
-
-    transform = Transform(Input=slice, Transform="Transform")
-    transform.Transform.Scale = [1.0, 1.0, 1.0]
-    transform.Transform.Translate = [0.0, 0.0, 0.0]
-    transform.Transform.Rotate = rotate_geometry
-    transform.UpdatePipeline()
-
-    if "chord_func" in kwargs:
-        pass
-    else:
-        chord_calc = Calculator(Input=transform)
-        chord_calc.AttributeType = "Point Data"
-        chord_calc.Function = (
-            "(coords.iHat - " + str(offset[0]) + ")/" + str(offset[1] - offset[0])
-        )
-        chord_calc.ResultArrayName = "chord"
-
-    # Attempt to calculate forces
-    pforce = [0.0, 0.0, 0.0]
-    fforce = [0.0, 0.0, 0.0]
-    pmoment = [0.0, 0.0, 0.0]
-    fmoment = [0.0, 0.0, 0.0]
-    pmomentx = [0.0, 0.0, 0.0]
-    fmomentx = [0.0, 0.0, 0.0]
-    pmomenty = [0.0, 0.0, 0.0]
-    fmomenty = [0.0, 0.0, 0.0]
-    pmomentz = [0.0, 0.0, 0.0]
-    fmomentz = [0.0, 0.0, 0.0]
-
-    sum = MinMax(Input=slice)
-    sum.Operation = "SUM"
-    sum.UpdatePipeline()
-
-    sum_client = servermanager.Fetch(sum)
-    if sum_client.GetCellData().GetArray("pressureforce"):
-        pforce = sum_client.GetCellData().GetArray("pressureforce").GetTuple(0)
-        pforce = rotate_vector(pforce, alpha, beta)
-
-    if sum_client.GetCellData().GetArray("frictionforce"):
-        fforce = sum_client.GetCellData().GetArray("frictionforce").GetTuple(0)
-        fforce = rotate_vector(fforce, alpha, beta)
-        """
-        # Add sectional force integration
-        sorted_line = PlotOnSortedLines(Input=chord_calc)
-        sorted_line.UpdatePipeline()
-        sorted_line = servermanager.Fetch(sorted_line)
-        cp_array = sorted_line.GetCellData().GetArray("cp")
-
-        for i in range(0,len(cp_array)):
-            sorted_line.GetPointData().GetArray("X")
-            pass
-        """
-    if sum_client.GetCellData().GetArray("pressuremoment"):
-        pmoment = sum_client.GetCellData().GetArray("pressuremoment").GetTuple(0)
-        pmoment = rotate_vector(pmoment, alpha, beta)
-
-    if sum_client.GetCellData().GetArray("frictionmoment"):
-        fmoment = sum_client.GetCellData().GetArray("frictionmoment").GetTuple(0)
-        fmoment = rotate_vector(fmoment, alpha, beta)
-
-    if sum_client.GetCellData().GetArray("pressuremomentx"):
-        pmomentx = sum_client.GetCellData().GetArray("pressuremomentx").GetTuple(0)
-        pmomentx = rotate_vector(pmomentx, alpha, beta)
-
-    if sum_client.GetCellData().GetArray("frictionmomentx"):
-        fmomentx = sum_client.GetCellData().GetArray("frictionmomentx").GetTuple(0)
-        fmomentx = rotate_vector(fmomentx, alpha, beta)
-
-    if "func" in kwargs:
-        sorted_line = PlotOnSortedLines(Input=chord_calc)
-        sorted_line.UpdatePipeline()
-        extract_client = servermanager.Fetch(sorted_line)
-        for_each(extract_client, **kwargs)
-
-    Delete(chord_calc)
-    del chord_calc
-    Delete(sum)
-    del sum
-    del sum_client
-    Delete(slice)
-    del slice
-    Delete(sorted_line)
-    del sorted_line
-    del extract_client
-
-    return {
-        "pressure force": pforce,
-        "friction force": fforce,
-        "pressure moment": pmoment,
-        "friction moment": fmoment,
-    }
-
-
-def cp_profile_span(surface, slice_normal, slice_origin, **kwargs):
-    alpha = 0.0
-    if "alpha" in kwargs:
-        alpha = kwargs["alpha"]
-    beta = 0.0
-    if "beta" in kwargs:
-        beta = kwargs["beta"]
-
-    point_data = CellDatatoPointData(Input=surface)
-    point_data.PassCellData = 1
-    clip = Clip(Input=point_data, ClipType="Plane")
-    clip.ClipType.Normal = [0.0, 1.0, 0.0]
-    clip.ClipType.Origin = [0.0, 0.0, 0.0]
-    clip.UpdatePipeline()
-
-    slice = Slice(Input=clip, SliceType="Plane")
-
-    slice.SliceType.Normal = slice_normal
-    slice.SliceType.Origin = slice_origin
-
-    slice.UpdatePipeline()
-
-    offset = get_chord_spanwise(slice)
-    # define the cuts and make sure the is the one one you want
-    # make the
-    chord_calc = Calculator(Input=slice)
-
-    chord_calc.AttributeType = "Point Data"
-    chord_calc.Function = (
-        "(coords.jHat - " + str(offset[0]) + ")/" + str(offset[1] - offset[0])
-    )
-    chord_calc.ResultArrayName = "chord"
-
-    sum = MinMax(Input=slice)
-    sum.Operation = "SUM"
-    sum.UpdatePipeline()
-
-    sum_client = servermanager.Fetch(sum)
-    pforce = sum_client.GetCellData().GetArray("pressureforce").GetTuple(0)
-    fforce = sum_client.GetCellData().GetArray("frictionforce").GetTuple(0)
-
-    pforce = rotate_vector(pforce, alpha, beta)
-    fforce = rotate_vector(fforce, alpha, beta)
-
-    if "func" in kwargs:
-        sorted_line = PlotOnSortedLines(Input=chord_calc)
-        sorted_line.UpdatePipeline()
-        extract_client = servermanager.Fetch(sorted_line)
-        for_each(extract_client, **kwargs)
-
-    return {"pressure force": pforce, "friction force": fforce}
-
-
-def cf_profile_wall_from_file(file_root, slice_normal, slice_origin, **kwargs):
-    wall = PVDReader(FileName=file_root + "_wall.pvd")
-    clean = CleantoGrid(Input=wall)
-    clean.UpdatePipeline()
-    inp = servermanager.Fetch(clean)
-    if inp.IsA("vtkMultiBlockDataSet"):
-        inp = MergeBlocks(Input=clean)
-    else:
-        inp = clean
-
-    Delete(wall)
-    del wall
-    profile = cf_profile(inp, slice_normal, slice_origin, **kwargs)
-    Delete(clean)
-    del clean
-    Delete(inp)
-    del inp
-
-    return profile
-
-
-def cf_profile(surface, slice_normal, slice_origin, **kwargs):
-    alpha = 0.0
-    if "alpha" in kwargs:
-        alpha = kwargs["alpha"]
-    beta = 0.0
-    if "beta" in kwargs:
-        beta = kwargs["beta"]
-
-    point_data = CellDatatoPointData(Input=surface)
-    point_data.PassCellData = 1
-
-    slice = Slice(Input=point_data, SliceType="Plane")
-
-    slice.SliceType.Normal = slice_normal
-    slice.SliceType.Origin = slice_origin
-
-    slice.UpdatePipeline()
-
     offset = get_chord(slice)
 
-    chord_calc = Calculator(Input=slice)
-
+    chord_calc = pvs.Calculator(Input=slice)
     chord_calc.AttributeType = "Point Data"
     chord_calc.Function = (
         "(coords.iHat - " + str(offset[0]) + ")/" + str(offset[1] - offset[0])
     )
     chord_calc.ResultArrayName = "chord"
 
-    cf_calc = Calculator(Input=chord_calc)
+    sorted_line = pvs.PlotOnSortedLines(Input=chord_calc)
+    sorted_line.UpdatePipeline()
+
+    rawData = pvs.servermanager.Fetch(sorted_line)
+    slice_dict = {}
+    for block_index in range(rawData.GetNumberOfBlocks()):
+        data = DataSet(rawData.GetBlock(block_index))
+        slice_dict[block_index] = {
+            metric_name: data.PointData[metric_name],
+            "chord": data.PointData["chord"],
+        }
+
+    # clean up
+    pvs.Delete(chord_calc)
+    del chord_calc
+    pvs.Delete(slice)
+    del slice
+    pvs.Delete(sorted_line)
+    del sorted_line
+
+    return slice_dict
+
+
+def cp_profile(surface, normal, slice_loc) -> dict:
+    """Calculate cp profile from a VTK surface data slice
+
+    Inputs:
+    surface: VTKPointData object to take cp cut from
+    slice_normal: [nx, ny, nz] normal vector to the cut
+    slice_origin: [x, y, z] location of the slice
+    metric_name: str name of the metric to be plotted
+
+    Optional:
+    time_average: whether to take the time averaged solution for unsteady simulations (default=False)
+
+    Returns:
+    slice_dict: dict = {multiblockID: {"chord", "cp"}}
+    """
+    return slice_metric(surface, normal, slice_loc, "cp")
+
+
+def cf_profile_wall_from_file(
+    file_root: tuple, slice_normal: tuple, slice_origin: tuple, **kwargs
+) -> dict:
+    """Force coefficient calculation at slice loaction for a file string"""
+    wall = pvs.PVDReader(FileName=file_root + "_wall.pvd")
+    clean = pvs.CleantoGrid(Input=wall)
+    clean.UpdatePipeline()
+    inp = pvs.servermanager.Fetch(clean)
+    if inp.IsA("vtkMultiBlockDataSet"):
+        inp = pvs.MergeBlocks(Input=clean)
+    else:
+        inp = clean
+
+    pvs.Delete(wall)
+    del wall
+    out = cf_profile(inp, slice_normal, slice_origin, **kwargs)
+    pvs.Delete(clean)
+    del clean
+    pvs.Delete(inp)
+    del inp
+
+    return out
+
+
+def cf_profile(surface: tuple, slice_normal: tuple, slice_loc: tuple, **kwargs) -> None:
+    '''Calculate the force coefficient profile for a slice defined with "slice_normal" and "slice_origin"'''
+
+    cf_calc = pvs.Calculator(Input=surface)
 
     cf_calc.AttributeType = "Point Data"
     cf_calc.Function = "mag(cf)"
     cf_calc.ResultArrayName = "cfmag"
 
-    sum = MinMax(Input=slice)
-    sum.Operation = "SUM"
-    sum.UpdatePipeline()
-
-    sum_client = servermanager.Fetch(sum)
-    pforce = sum_client.GetCellData().GetArray("pressureforce").GetTuple(0)
-    fforce = sum_client.GetCellData().GetArray("frictionforce").GetTuple(0)
-
-    pforce = rotate_vector(pforce, alpha, beta)
-    fforce = rotate_vector(fforce, alpha, beta)
-
-    if "func" in kwargs:
-        sorted_line = PlotOnSortedLines(Input=cf_calc)
-        sorted_line.UpdatePipeline()
-        extract_client = servermanager.Fetch(sorted_line)
-        for_each(extract_client, **kwargs)
-
-    return {"pressure force": pforce, "friction force": fforce}
+    return slice_metric(cf_calc, slice_normal, slice_loc, "cfmag")
 
 
-def get_csv_data(filename, header=False, remote=False, delim=" "):
-    """Get csv data"""
-    if remote:
-        theory = CSVReader(FileName=[filename])
-        theory.HaveHeaders = 0
-        if header:
-            theory.HaveHeaders = 1
-        theory.MergeConsecutiveDelimiters = 1
-        theory.UseStringDelimiter = 0
-        theory.DetectNumericColumns = 1
-        theory.FieldDelimiterCharacters = delim
-        theory.UpdatePipeline()
-        theory_client = servermanager.Fetch(theory)
-        table = Table(theory_client)
-        data = table.RowData
-    else:
-        import pandas as pd
-
-        if not header:
-            data = pd.read_csv(filename, sep=delim, header=None)
-        else:
-            data = pd.read_csv(filename, sep=delim)
-    return data
-
-
-def get_fw_csv_data(filename, widths, header=False, remote=False, **kwargs):
-    if remote:
-        theory = CSVReader(FileName=[filename])
-        theory.HaveHeaders = 0
-        theory.MergeConsecutiveDelimiters = 1
-        theory.UseStringDelimiter = 0
-        theory.DetectNumericColumns = 1
-        theory.FieldDelimiterCharacters = " "
-        theory.UpdatePipeline()
-
-        theory_client = servermanager.Fetch(theory)
-
-        table = Table(theory_client)
-
-        data = table.RowData
-
-    else:
-        import pandas as pd
-
-        if not header:
-            data = pd.read_fwf(filename, sep=" ", header=None, widths=widths, **kwargs)
-        else:
-            data = pd.read_fwf(filename, sep=" ", width=widths, **kwargs)
-
-    return data
-
-
-def screenshot(wall):
+def screenshot() -> None:
+    """TODO finalise..."""
     # position camera
-    view = GetActiveView()
+    view = pvs.GetActiveView()
     if not view:
         # When using the ParaView UI, the View will be present, not otherwise.
-        view = CreateRenderView()
+        view = pvs.CreateRenderView()
     view.CameraViewUp = [0, 0, 1]
     view.CameraFocalPoint = [0, 0, 0]
     view.CameraViewAngle = 45
     view.CameraPosition = [5, 0, 0]
 
     # draw the object
-    Show()
+    pvs.Show()
 
     # set the background color
     view.Background = [1, 1, 1]  # white
@@ -892,7 +719,7 @@ def screenshot(wall):
     # set image size
     view.ViewSize = [200, 300]  # [width, height]
 
-    dp = GetDisplayProperties()
+    dp = pvs.GetDisplayProperties()
 
     # set point color
     dp.AmbientColor = [1, 0, 0]  # red
@@ -906,13 +733,14 @@ def screenshot(wall):
     # set representation
     dp.Representation = "Surface"
 
-    Render()
+    pvs.Render()
 
     # save screenshot
-    WriteImage("test.png")
+    pvs.WriteImage("test.png")
 
 
-def sum_array(input, array_name):
+def sum_array(input: any, array_name: str) -> list:
+    '''Sum of desired array over every cell in "input"'''
     sum = [0.0, 0.0, 0.0]
     p = input.GetCellData().GetArray(array_name)
     numCells = input.GetNumberOfCells()
@@ -923,126 +751,61 @@ def sum_array(input, array_name):
     return sum
 
 
-def get_case_file():
-    with cd(remote_dir):
-        get(case_name + ".py", "%(path)s")
-
-
-def cat_case_file(remote_dir, case_name):
-    with cd(remote_dir):
-        with hide("output", "running", "warnings"), settings(warn_only=True):
-            # cmd = 'cat '+case_name+'.py'
-            import io
-
-            contents = io.StringIO()
-            get(case_name + ".py", contents)
-            # operate on 'contents' like a file object here, e.g. 'print
-            return contents.getvalue()
-
-
-def cat_status_file(remote_dir, case_name):
-    with cd(remote_dir), hide("output", "running", "warnings"), settings(
-        warn_only=True
-    ):
-        # cmd = 'cat '+case_name+'_status.txt'
-        import io
-
-        contents = io.StringIO()
-        result = get(case_name + "_status.txt", contents)
-        if result.succeeded:
-            # operate on 'contents' like a file object here, e.g. 'print
-            return contents.getvalue()
-        else:
-            return None
-
-
-def get_case_parameters_str(case_name, **kwargs):
-    # global remote_data, data_dir, data_host, remote_server_auto, paraview_cmd
-    _remote_dir = analysis.data.data_dir
+def get_case_parameters_str(case_name: str, **kwargs) -> Optional[str]:
+    "Returns a string of the input dictionary for a zCFD case"
+    _data_dir = analysis.data.data_dir
     if "data_dir" in kwargs:
-        _remote_dir = kwargs["data_dir"]
-    _remote_host = analysis.data.data_host
-    if "data_host" in kwargs:
-        _remote_host = kwargs["data_host"]
+        _data_dir = kwargs["data_dir"]
 
-    _remote_data = analysis.data.remote_data
-    if "remote_data" in kwargs:
-        _remote_data = kwargs["remote_data"]
+    try:
+        # Get contents of local file
+        with open(_data_dir + "/" + case_name + ".py") as f:
+            case_file_str = f.read()
 
-    if _remote_data:
-        env.use_ssh_config = True
-        env.host_string = _remote_host
-        case_file_str = cat_case_file(_remote_dir, case_name)
-        return case_file_str
-    else:
-        try:
-            # Get contents of local file
-            with open(_remote_dir + "/" + case_name + ".py") as f:
-                case_file_str = f.read()
-
-                if case_file_str is not None:
-                    # print status_file_str
-                    return case_file_str
-                else:
-                    print("WARNING: " + case_name + ".py file not found")
-                    return None
-        except:
-            print("WARNING: " + case_name + ".py file not found")
-            return None
+            if case_file_str is not None:
+                # print status_file_str
+                return case_file_str
+            else:
+                print("WARNING: " + case_name + ".py file not found")
+                return None
+    except:
+        print("WARNING: " + case_name + ".py file not found")
+        return None
 
 
-def get_case_parameters(case_name, **kwargs):
+def get_case_parameters(case_name: str, **kwargs) -> dict:
+    """Returns the zCFD input parameter dictionary"""
     case_file_str = get_case_parameters_str(case_name, **kwargs)
     namespace = {}
     exec(case_file_str, namespace)
     return namespace["parameters"]
 
 
-def get_status_dict(case_name, **kwargs):
-    # global remote_data, data_dir, data_host, remote_server_auto, paraview_cmd
-
-    _remote_data = analysis.data.remote_data
-    if "remote_data" in kwargs:
-        _remote_data = kwargs["remote_data"]
-
-    _remote_dir = analysis.data.data_dir
+def get_status_dict(case_name: str, **kwargs) -> Optional[str]:
+    """Returns a string of the status of a zCFD run"""
+    _data_dir = analysis.data.data_dir
     if "data_dir" in kwargs:
-        _remote_dir = kwargs["data_dir"]
+        _data_dir = kwargs["data_dir"]
 
-    if _remote_data:
-        _remote_host = analysis.data.data_host
-        if "data_host" in kwargs:
-            _remote_host = kwargs["data_host"]
+    try:
+        # Get contents of local file
+        with open(_data_dir + "/" + case_name + "_status.txt") as f:
+            status_file_str = f.read()
 
-        env.use_ssh_config = True
-        env.host_string = _remote_host
-        status_file_str = cat_status_file(_remote_dir, case_name)
-
-        if status_file_str is not None:
-            # print status_file_str
-            return json.loads(status_file_str)
-        else:
-            print("WARNING: " + case_name + "_status.txt file not found")
-            return None
-    else:
-        try:
-            # Get contents of local file
-            with open(_remote_dir + "/" + case_name + "_status.txt") as f:
-                status_file_str = f.read()
-
-                if status_file_str is not None:
-                    # print status_file_str
-                    return json.loads(status_file_str)
-                else:
-                    print("WARNING: " + case_name + "_status.txt file not found")
-                    return None
-        except Exception as e:
-            print("WARNING: " + case_name + "_status.txt file not found")
-            print("Caught exception " + str(e))
-            return None
+            if status_file_str is not None:
+                # print status_file_str
+                return json.loads(status_file_str)
+            else:
+                print("WARNING: " + case_name + "_status.txt file not found")
+                return None
+    except Exception as e:
+        print("WARNING: " + case_name + "_status.txt file not found")
+        print("Caught exception " + str(e))
+        return None
 
 
-def get_num_procs(case_name, **kwargs):
+def get_num_procs(case_name: str, **kwargs) -> Optional[int]:
+    """Returns the number of processes used in a zCFD run"""
     # remote_host,remote_dir,case_name):
     status = get_status_dict(case_name, **kwargs)
     if status is not None:
@@ -1054,67 +817,37 @@ def get_num_procs(case_name, **kwargs):
         print("status file not found")
 
 
-def get_case_root(case_name, num_procs=None):
+def get_case_root(case_name: str, num_procs: Optional[str]) -> str:
+    """Returns the output folder path for a specified zCFD run"""
     if num_procs is None:
         num_procs = get_num_procs(case_name)
     return case_name + "_P" + str(num_procs) + "_OUTPUT/" + case_name
 
 
-def get_case_report(case):
+def get_case_report(case: str) -> str:
+    """Returns the path to the zCFD report file for a specific run"""
     return case + "_report.csv"
 
 
-def print_html_parameters(parameters):
-    reference = parameters["reference"]
-    # material = parameters['material']
-    conditions = parameters[reference]
-
-    mach = 0.0
-    speed = 0.0
-
-    if "Mach" in conditions["V"]:
-        mach = conditions["V"]["Mach"]
-        speed = 0.0
-    else:
-        speed = mag(conditions["V"]["vector"])
-        mach = 0.0
-
-    if "Reynolds No" in conditions:
-        reynolds = conditions["Reynolds No"]
-    else:
-        reynolds = "undefined"
-
-    if "Reference Length" in conditions:
-        reflength = conditions["Reference Length"]
-    else:
-        reflength = "undefined"
-
-    import string
-
-    html_template = """<table>
-<tr><td>pressure</td><td>$pressure</td></tr>
-<tr><td>temperature</td><td>$temperature</td></tr>
-<tr><td>Reynolds No</td><td>$reynolds</td></tr>
-<tr><td>Ref length</td><td>$reflength</td></tr>
-<tr><td>Speed</td><td>$speed</td></tr>
-<tr><td>Mach No</td><td>$mach</td></tr>
-</table>"""
-    html_output = string.Template(html_template)
-
-    return html_output.substitute(
-        {
-            "pressure": conditions["pressure"],
-            "temperature": conditions["temperature"],
-            "reynolds": reynolds,
-            "reflength": reflength,
-            "speed": speed,
-            "mach": mach,
-        }
-    )
+def get_case_success(case: str) -> bool:
+    """Scans the zCFD log file to identify if a run has successfully completed"""
+    # remove .py file exension if its provided
+    case_clean = clean_name(case)
+    try:
+        with open(case_clean + ".log", "r") as f:
+            for line in f.readlines():
+                if "Solver loop finished" in line:
+                    return True
+    except FileExistsError as e:
+        print(e)
+        return False
+    return False
 
 
 class ProgressBar(object):
-    def __init__(self):
+    """Class to display a progress bar when performing rendering opteraions"""
+
+    def __init__(self) -> None:
         self.pbar = tqdm(total=100)
 
     def __iadd__(self, v):
@@ -1126,139 +859,3 @@ class ProgressBar(object):
 
     def update(self, i):
         self.pbar.update(i)
-
-
-# remote_data = True
-# data_host = 'user@server'
-# data_dir = 'data'
-# remote_server_auto = True
-# paraview_cmd = 'mpiexec pvserver'
-# paraview_home = '/usr/local/bin/'
-# job_queue = 'default'
-# job_tasks = 1
-# job_ntaskpernode = 1
-# job_project = 'default'
-
-
-def data_location_form_html(**kwargs):
-    global remote_data, data_dir, data_host, remote_server_auto, paraview_cmd
-    global job_queue, job_tasks, job_ntaskpernode, job_project
-
-    if "data_dir" in kwargs:
-        data_dir = kwargs["data_dir"]
-    if "paraview_cmd" in kwargs:
-        paraview_cmd = kwargs["paraview_cmd"]
-    if "data_host" in kwargs:
-        data_host = kwargs["data_host"]
-
-    remote_data_checked = ""
-    if remote_data:
-        remote_data_checked = 'checked="checked"'
-    remote_server_auto_checked = ""
-    if remote_server_auto:
-        remote_server_auto_checked = 'checked="checked"'
-
-    remote_cluster_checked = ""
-    job_queue = "default"
-    job_tasks = 1
-    job_ntaskpernode = 1
-    job_project = "default"
-
-    input_form = """
-<div style="background-color:gainsboro; border:solid black; width:640px; padding:20px;">
-<label style="width:22%;display:inline-block">Remote Data</label>
-<input type="checkbox" id="remote_data" value="remote" {remote_data_checked}><br>
-<label style="width:22%;display:inline-block">Data Directory</label>
-<input style="width:75%;" type="text" id="data_dir" value="{data_dir}"><br>
-<label style="width:22%;display:inline-block">Data Host</label>
-<input style="width:75%;" type="text" id="data_host" value="{data_host}"><br>
-<label style="width:22%;display:inline-block">Remote Server Auto</label>
-<input type="checkbox" id="remote_server_auto" value="remote_auto" {remote_server_auto_checked}><br>
-<label style="width:22%;display:inline-block">Paraview Cmd </label>
-<input style="width:75%;" type="text" id="paraview_cmd" value="{paraview_cmd}"><br>
-<label style="width:22%;display:inline-block">Remote Cluster</label>
-<input type="checkbox" id="remote_cluster" value="remote_cluster" {remote_cluster_checked}><br>
-<label style="width:22%;display:inline-block">Job Queue </label>
-<input style="width:75%;" type="text" id="job_queue" value="{job_queue}"><br>
-<label style="width:22%;display:inline-block">Job Tasks </label>
-<input style="width:75%;" type="text" id="job_tasks" value="{job_tasks}"><br>
-<label style="width:22%;display:inline-block">Job Tasks per Node </label>
-<input style="width:75%;" type="text" id="job_ntaskpernode" value="{job_ntaskpernode}"><br>
-<label style="width:22%;display:inline-block">Job Project </label>
-<input style="width:75%;" type="text" id="job_project" value="{job_project}"><br>
-<button onclick="apply()">Apply</button>
-</div>
-"""
-
-    javascript = """
-    <script type="text/Javascript">
-        function apply(){
-            var remote_data = ($('input#remote_data').is(':checked') ? 'True' : 'False');
-            var data_dir = $('input#data_dir').val();
-            var data_host = $('input#data_host').val();
-            var remote_server_auto = ($('input#remote_server_auto').is(':checked') ? 'True' : 'False');
-            var paraview_cmd = $('input#paraview_cmd').val();
-            var remote_cluster = ($('input#remote_cluster').is(':checked') ? 'True' : 'False');
-
-
-            var kernel = IPython.notebook.kernel;
-
-            // Send data dir to ipython
-            var  command = "from zutil import post; post.data_dir = '" + data_dir + "'";
-            console.log("Executing Command: " + command);
-            kernel.execute(command);
-
-            // Send data host to ipython
-            var  command = "from zutil import post; post.data_host = '" + data_host + "'";
-            console.log("Executing Command: " + command);
-            kernel.execute(command);
-
-            // Send remote server flag to ipython
-            var  command = "from zutil import post; post.remote_server_auto = " + remote_server_auto;
-            console.log("Executing Command: " + command);
-            kernel.execute(command);
-
-            // Send paraview command to ipython
-            var  command = "from zutil import post; post.paraview_cmd = '" + paraview_cmd + "'";
-            console.log("Executing Command: " + command);
-            kernel.execute(command);
-
-            // Send remote data flag to ipython
-            var  command = "from zutil import post; post.remote_data = " + remote_data ;
-            console.log("Executing Command: " + command);
-            kernel.execute(command);
-
-            // Set paraview command to none if not using remote server
-            var command = "from zutil import post; if not post.remote_server_auto: post.paraview_cmd=None"
-            console.log("Executing Command: " + command);
-            kernel.execute(command);
-
-            // Set data to local host for local data
-            var command = "from zutil import post; if not post.post.remote_data: post.data_host='localhost'; post.paraview_cmd=None"
-            console.log("Executing Command: " + command);
-            kernel.execute(command);
-
-            if(remote_cluster == 'True'){
-                // Set cluster job info
-                //var command = "from zutil import post; post.jo";
-            }
-
-        }
-    </script>
-    """
-
-    return HTML(
-        input_form.format(
-            data_dir=data_dir,
-            data_host=data_host,
-            paraview_cmd=paraview_cmd,
-            remote_data_checked=remote_data_checked,
-            remote_server_auto_checked=remote_server_auto_checked,
-            remote_cluster_checked=remote_cluster_checked,
-            job_queue=job_queue,
-            job_tasks=job_tasks,
-            job_ntaskpernode=job_ntaskpernode,
-            job_project=job_project,
-        )
-        + javascript
-    )

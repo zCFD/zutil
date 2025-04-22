@@ -24,59 +24,64 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Module init for plot functions- determines paraview compatibility and sets out which rendering engine should be used"""
+Transforms required to convert from global coordinate system to blade element coordinate system
 
-import matplotlib
-import matplotlib.pyplot as plt
-from matplotlib.rcsetup import all_backends
+Currently does not allow for deforming blades, therefore all simulations will be rigid
+"""
 
-import paraview as pv
-import paraview.simple as pvs
-
-import os
-
-# Configure rendering for remote or interactive widgets
-if "BATCH_ANALYSIS" in os.environ:
-    batch = True
-else:
-    batch = False
-
-# https://matplotlib.org/stable/users/explain/figure/backends.html
-
-matplotlib.rcParams.update({"backend_fallback": False})
-matplotlib.rcParams.update({"figure.max_open_warning": 0})
+import numpy as np
 
 
-if batch:
-    # Script mode- don't render figures in interactive widgets
-    if "Agg" in all_backends:
-        matplotlib.use("Agg")
-    else:
-        matplotlib.use("agg")
-    plt.ioff()
-else:
-    # Interactive mode- use nbAgg backend
-    matplotlib.use("module://ipympl.backend_nbagg")
-    plt.ion()
+# indvidual Rotation matrices
 
-# To run scripts written for ParaView 4.0 in newer versions, you can use the following.
 
-pv.compatibility.major = 5
-pv.compatibility.minor = 4
+def R_xx(a):
+    return np.array(
+        [[1.0, 0.0, 0.0], [0.0, np.cos(a), np.sin(a)], [0.0, -np.sin(a), np.cos(a)]]
+    )
 
-pvs._DisableFirstRenderCameraReset()
 
-# Messy, but ensures compatibility with exisiting test harness structure for now
-from .zplot import get_figure
-from .zplot import x_label
-from .zplot import y_label
-from .zplot import set_title
-from .zplot import set_suptitle
-from .zplot import set_legend
-from .zplot import set_ticks
+def R_yy(a):
+    return np.array(
+        [[np.cos(a), 0.0, -np.sin(a)], [0.0, 1.0, 0.0], [np.sin(a), 0.0, np.cos(a)]]
+    )
 
-from .plot_report import Report
-from .plot_report import zCFD_Plots
 
-from . import font as ft
-from . import colour as cl
+def R_zz(a):
+    return np.array(
+        [[np.cos(a), np.sin(a), 0.0], [-np.sin(a), np.cos(a), 0.0], [0.0, 0.0, 1.0]]
+    )
+
+
+# triad combinations
+def T_gh(yaw, tilt, azimuth):
+    t_yaw = R_zz(yaw)
+    t_tilt = R_xx(tilt)
+    t_azimuth = R_yy(azimuth)
+    return t_azimuth @ t_tilt @ t_yaw
+
+
+def T_hb(azimuth, cone, pitch):
+    t_azimuth = R_yy(azimuth)
+    t_cone = R_zz(cone)
+    t_pitch = R_xx(pitch)
+    return t_pitch @ t_cone @ t_azimuth
+
+
+def T_bh(azimuth, cone, pitch):
+    t_hb = T_hb(cone, pitch)
+    return np.linalg.inv(t_hb)
+
+
+def T_bc(twist, sweep, prebend):
+    t_twist = R_xx(twist)
+    t_sweep = R_yy(sweep)
+    t_prebend = R_zz(prebend)
+    return t_twist @ t_sweep @ t_prebend
+
+
+def global2chord(yaw, tilt, azimuth, cone, pitch, twist, sweep, prebend):
+    t_gh = T_gh(yaw, tilt, azimuth)
+    t_hb = T_hb(cone, pitch)
+    t_bc = T_bc(twist, sweep, prebend)
+    return t_bc @ t_hb @ t_gh
