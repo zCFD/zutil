@@ -24,14 +24,12 @@ ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-Module init for plot functions- determines paraview compatibility and sets out which rendering engine should be used"""
+Module init for ploting zCFD functions- only dependencies are matplotlib, numpy, and pandas
+"""
 
 import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.rcsetup import all_backends
-
-import paraview as pv
-import paraview.simple as pvs
 
 import os
 
@@ -58,13 +56,6 @@ else:
     # Interactive mode- use nbAgg backend
     matplotlib.use("module://ipympl.backend_nbagg")
     plt.ion()
-
-# To run scripts written for ParaView 4.0 in newer versions, you can use the following.
-
-pv.compatibility.major = 5
-pv.compatibility.minor = 4
-
-pvs._DisableFirstRenderCameraReset()
 
 # Messy, but ensures compatibility with exisiting test harness structure for now
 from .zplot import get_figure

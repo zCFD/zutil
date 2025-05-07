@@ -71,10 +71,10 @@ class zCFD_Plots:
         for report in self.reports:
             report.plot_residuals()
 
-    def plot_forces(self, mean: int = 20) -> None:
+    def plot_forces(self, variables=None, mean: int = 20) -> None:
         """Plot forces for all reports"""
-        for report in self.reports:
-            report.plot_forces(mean)
+        for ii, report in enumerate(self.reports):
+            report.plot_forces(variables=variables, mean=mean, report_index=ii)
 
     def plot_performance(self) -> None:
         """Plot performance for all reports"""
@@ -101,6 +101,11 @@ class Report(zCFD_Result):
         self.cb_container = None
         self.button = None
         self.rolling_avg = 100
+
+        if "BATCH_ANALYSIS" in os.environ:
+            self.batch = True
+        else:
+            self.batch = False
 
         if not control_file:
             print("Report() is deprecated, use zcfd_plots(path_to_controlfile) instead")
@@ -143,12 +148,53 @@ class Report(zCFD_Result):
         ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
         plt.legend(loc="center left", bbox_to_anchor=(1.0, 0.5))
 
-        if "BATCH_ANALYSIS" in os.environ:
+        if self.batch:
             fig.savefig(self.control_file_stem + "_residuals.png", dpi=100)
+
         plt.show()
         self.visible_fig = []
 
-    def plot_forces(self, mean: int = 20) -> None:
+    def plot_forces(
+        self, variables=None, mean: int = 20, report_index: Optional[int] = None
+    ) -> None:
+        if self.batch:
+            if report_index is not None:
+                print("report_index: {}".format(report_index))
+            print("Plotting forces for case: {}".format(self.control_file_stem))
+            self.plot_forces_batch(variables=variables, mean=mean)
+        else:
+            self.plot_forces_interactive(mean=mean)
+
+    def _print_variables(self):
+        """Print available variables to plot"""
+        print("Available variables to plot:")
+        available_vars = []
+        for var in self.report.data.keys():
+            if var not in self.report.residual_list + ["RealTimeStep", "Cycle"]:
+                available_vars.append(var)
+
+        print(available_vars)
+
+    def plot_forces_batch(self, variables: Optional[list] = None, mean: int = 20):
+        if not variables:
+            # print available variables
+            self._print_variables()
+
+        else:
+            # check if variable is valid:
+            for var in variables:
+                if var not in self.report.data.keys():
+                    print(f"ERROR: Variable '{var}' not found in report data.")
+                    self._print_variables()
+                else:
+                    print(f"Plotting '{var}'...  ")
+                    rolling = self.report.data.rolling(self.rolling_avg).mean()
+                    fig, ax = _forces_plot(self.report, var)
+                    _rolling_avg(rolling, var, ax)
+                    fig.savefig(f"{self.control_file_stem}_{var}.png")
+                    print(f"... Saved {self.control_file_stem}_{var}.png")
+
+    def plot_forces_interactive(self, mean: int = 20) -> None:
         """Create a checkbox widget to plot force and monitor data from a zCFD report file"""
         # Need to disable autoscroll
         # autoscroll(-1)
@@ -203,26 +249,9 @@ class Report(zCFD_Result):
             rolling = self.report.data.rolling(self.rolling_avg).mean()
             for cb in self.checkboxes:
                 if cb.value:
-                    h = cb.description
-                    fig = plt.figure()
-                    ax = fig.gca()
-                    y = h
-                    self.report.data.plot(x="Cycle", y=y, ax=ax, legend=False)
-                    rolling.plot(x="Cycle", y=y, ax=ax, legend=False)
-                    last_val = self.report.data[h].tail(1).values
-                    # $\downarrow$ $\uparrow$ $\leftrightarrow$
-                    rolling_grad = (
-                        rolling[h].tail(2).values[0] - rolling[h].tail(2).values[1]
-                    )
-                    trend = r"$\leftrightarrow$"
-                    if rolling_grad > 0.0:
-                        trend = r"$\downarrow$"
-                    elif rolling_grad < 0.0:
-                        trend = r"$\uparrow$"
-                    ax.set_title(str(h) + " - " + str(last_val) + " " + trend)
-                    ax.grid(True)
-                    ax.set_xlabel("cycles")
-                    ax.set_ylabel(h)
+                    y = cb.description
+                    fig, ax = _forces_plot(self.report, y)
+                    _rolling_avg(rolling, y, ax)
                     self.visible_fig.append(fig)
                     plt.show()
 
@@ -264,7 +293,7 @@ class Report(zCFD_Result):
             ax.plot(rank_memory_usage)
             if len(rank_memory_usage) > 0:
                 ax.plot(rank_memory_usage, label="Rank {}".format(ii))
-                if "BATCH_ANALYSIS" in os.environ:
+                if self.batch:
                     fig.savefig(self.control_file_stem + "_memory_usage.png", dpi=100)
                 ax.annotate(
                     "Rank {}".format(ii),
@@ -347,3 +376,28 @@ def _get_linear_solve_memory_usage_from_file(log_file: str) -> list:
             main_solve_memory_usage.append(value)
 
     return main_solve_memory_usage
+
+
+def _forces_plot(report, y_axis):
+    fig = plt.figure()
+    ax = fig.gca()
+    report.data.plot(x="Cycle", y=y_axis, ax=ax, legend=False)
+    last_val = report.data[y_axis].tail(1).values
+
+    ax.grid(True)
+    ax.set_xlabel("cycles")
+    ax.set_ylabel(y_axis)
+    ax.set_title(str(y_axis) + " - " + str(last_val))
+    return fig, ax
+
+
+def _rolling_avg(rolling, y_axis, ax):
+    rolling.plot(x="Cycle", y=y_axis, ax=ax, legend=False)
+    # $\downarrow$ $\uparrow$ $\leftrightarrow$
+    rolling_grad = rolling[y_axis].tail(2).values[0] - rolling[y_axis].tail(2).values[1]
+    trend = r"$\leftrightarrow$"
+    if rolling_grad > 0.0:
+        trend = r"$\downarrow$"
+    elif rolling_grad < 0.0:
+        trend = r"$\uparrow$"
+    ax.set_title(ax.get_title() + " " + trend)
