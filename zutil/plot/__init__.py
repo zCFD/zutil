@@ -65,6 +65,13 @@ from .zplot import set_title
 from .zplot import set_suptitle
 from .zplot import set_legend
 from .zplot import set_ticks
+from .zplot import plt_logo_stamp
+
+from .acoustic_plots import plot_thirdoctave
+from .acoustic_plots import plot_observer
+from .acoustic_plots import plot_PSD
+from .acoustic_plots import plot_all_thirdoctave
+from .acoustic_plots import plot_all_PSD
 
 from .plot_report import Report
 from .plot_report import zCFD_Plots

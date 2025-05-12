@@ -64,7 +64,6 @@ try:
 
     from .post import vtk_logo_stamp
     from .post import vtk_text_stamp
-    from .post import plt_logo_stamp
 
     pv.compatibility.major = 5
     pv.compatibility.minor = 4

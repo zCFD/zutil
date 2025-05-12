@@ -39,10 +39,14 @@ from zutil.fileutils import (
     get_zcfd_result,
     zCFD_Result,
     zCFD_Overset_Result,
+    _get_average_time_from_file,
 )
+from zutil.analysis.acoustic import calculate_PSD
+from zutil.plot import plot_PSD, plot_thirdoctave
 from pathlib import Path
 from typing import Optional
 import warnings
+from matplotlib.axes import Axes
 
 
 class zCFD_Plots:
@@ -87,6 +91,14 @@ class zCFD_Plots:
             for report in self.reports:
                 report.plot_performance()
 
+    def get_performance_dict(self, ranks=[0]) -> dict:
+        """Get performance data for all reports on the specified ranks"""
+        solver_performance = {}
+        for report in self.reports:
+            report.get_performance_dict(solver_performance, ranks)
+
+        return solver_performance
+
     def plot_linear_solve_memory_usage(self) -> None:
         """Plot AMGX memory usage for all reports"""
         for report in self.reports:
@@ -113,6 +125,78 @@ class Report(zCFD_Result):
                 "Report() is deprecated, use zcfd_plots(path_to_controlfile) instead",
                 DeprecationWarning,
             )
+
+    def calculate_PSD(
+        self, monitor_name: Optional[str] = None, sampling_frequency=1.0
+    ) -> tuple[Optional[list], Optional[list]]:
+        """Calculate the Power Spectral Density (PSD) for a given monitor name"""
+
+        if not monitor_name:
+            self._print_variables()
+            return None, None
+        else:
+            if monitor_name not in self.report.data.keys():
+                raise ValueError(f"Monitor '{monitor_name}' not found in report data.")
+
+            print(f"Calculating PSD for {monitor_name}...")
+            print(self.report.data[monitor_name].to_list())
+            print(self.parameters["time marching"]["unsteady"]["time step"])
+            # Calculate the PSD for the specified monitor
+            f, Pxx_den = calculate_PSD(
+                self.report.data[monitor_name].to_list(),
+                self.parameters["time marching"]["unsteady"]["time step"],
+                sampling_frequency=sampling_frequency,
+            )
+
+            return f, Pxx_den
+
+    def plot_PSD(
+        self, monitor_name: Optional[str] = None, sampling_frequency=1.0
+    ) -> Optional[Axes]:
+        """Calculate the Power Spectral Density (PSD) for a given monitor name"""
+
+        if not monitor_name:
+            self._print_variables()
+            return None
+        else:
+            if monitor_name not in self.report.data.keys():
+                raise ValueError(f"Monitor '{monitor_name}' not found in report data.")
+
+            print(f"Calculating PSD for {monitor_name}...")
+            print(self.report.data[monitor_name].to_list())
+            print(self.parameters["time marching"]["unsteady"]["time step"])
+            # Calculate the PSD for the specified monitor
+            ax = plot_PSD(
+                self.report.data[monitor_name].to_list(),
+                self.parameters["time marching"]["unsteady"]["time step"],
+                sampling_frequency=sampling_frequency,
+            )
+
+            return ax
+
+    def plot_third_octave_bands(
+        self, monitor_name: Optional[str] = None, sampling_frequency=1.0
+    ) -> Optional[Axes]:
+        """Calculate the third-octave bands for a given monitor name"""
+
+        if not monitor_name:
+            self._print_variables()
+            return None
+        else:
+            if monitor_name not in self.report.data.keys():
+                raise ValueError(f"Monitor '{monitor_name}' not found in report data.")
+
+            print(f"Calculating third-octave bands for {monitor_name}...")
+            print(self.report.data[monitor_name].to_list())
+            print(self.parameters["time marching"]["unsteady"]["time step"])
+            # Calculate the third-octave bands for the specified monitor
+            ax = plot_thirdoctave(
+                self.report.data[monitor_name].to_list(),
+                self.parameters["time marching"]["unsteady"]["time step"],
+                sampling_frequency=sampling_frequency,
+            )
+
+            return ax
 
     def plot(self, csv_name):
         """code to support legacy plotting functionality"""
@@ -313,6 +397,23 @@ class Report(zCFD_Result):
 
         # ax.legend(loc="upper right")
         plt.show()
+
+    def get_performance_dict(self, performance_dict: dict, ranks=[0]) -> dict:
+        """Get performance data from zCFD log file"""
+
+        for rank in ranks:
+            rank_log = self.rank_report_paths[rank]
+            # get performance data from the log file
+            average_output_time = _get_average_time_from_file(rank_log, "outputing")
+            average_report_time = _get_average_time_from_file(rank_log, "reporting")
+            average_solve_time = _get_average_time_from_file(rank_log, "solving")
+            performance_dict[self._control_file_stem]["rank {}".format(rank)] = {
+                "average_output_time": average_output_time,
+                "average_report_time": average_report_time,
+                "average_solve_time": average_solve_time,
+            }
+
+        return performance_dict
 
 
 def _performance_plot(fname: str) -> None:

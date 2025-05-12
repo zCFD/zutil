@@ -45,6 +45,7 @@ import pandas as pd
 from pathlib import Path
 import matplotlib.image as image
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
+from zutil.fileutils import _get_logo_path
 
 standard_library.install_aliases()
 # from paraview.vtk.util import numpy_support
@@ -247,16 +248,6 @@ def calc_force_wall(
     return force
 
 
-def _get_logo_path(strapline=False):
-    zcfd_home = Path(__file__).parents[5]
-    if strapline:
-        logo = "ZCFD_Mark_CMYK.png"
-    else:
-        logo = "ZCFD_Mark_CMYK_No_Strapline_trans.png"
-    file_loc = zcfd_home / "share" / "assets" / logo
-    return str(file_loc)
-
-
 def vtk_logo_stamp(
     input: any, location="Upper Left Corner", logo_file=None, strapline=False
 ):
@@ -319,28 +310,6 @@ def vtk_text_stamp(
     else:
         textDisplay.Justification = location.split(" ")[1]
     return textDisplay
-
-
-def plt_logo_stamp(ax, location=(0.9, 0.95), logo_file=None, strapline=False):
-    """stamps a matplotlib plot with a zCFD logo
-    Inputs:
-    ax: matplotlib axis object
-    Optional:
-    location: tuple (default=(0.9,0.95)) location of the logo as a % of x and y axis position
-    logo_file: str (default=None) optional string to alternative logo file
-    strapline: bool (default=False) whether to include the strapline in the logo
-    """
-    if logo_file:
-        logo_path = logo_file
-    else:
-        logo_path = _get_logo_path(strapline)
-    logo = image.imread(logo_path)
-
-    imagebox = OffsetImage(logo, zoom=0.25)
-    ab = AnnotationBbox(imagebox, xy=location, xycoords="axes fraction", frameon=False)
-    ax.add_artist(ab)
-
-    return ax
 
 
 def calc_force(

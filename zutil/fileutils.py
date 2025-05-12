@@ -35,6 +35,7 @@ import glob
 import pandas as pd
 from typing import Optional, Union
 import re
+from importlib.resources import files
 
 
 class zCFD_Report(object):
@@ -75,7 +76,28 @@ class zCFD_Report(object):
                 self.residual_list.append(h + append_str)
 
 
-class zCFD_Result:
+class zCFD_Result_Base(object):
+    """Base class for zCFD result files"""
+
+    def __init__(self) -> None:
+        self.verbose: bool = False
+        self.log_file_path: str
+        self.report: zCFD_Report
+
+    def _print(self, message):
+        if self.verbose:
+            print(message)
+
+    def get_average_solve_time(self) -> float:
+        """Get average solve time for all reports"""
+        return _get_average_time_from_file(self.log_file_path, "solving")
+
+    def get_average_report_time(self) -> float:
+        """Get average report time for all reports"""
+        return _get_average_time_from_file(self.log_file_path, "reporting")
+
+
+class zCFD_Result(zCFD_Result_Base):
     """helper class for zCFD result files"""
 
     def __init__(
@@ -359,10 +381,6 @@ class zCFD_Result:
             )
             return False
 
-    def _print(self, message):
-        if self.verbose:
-            print(message)
-
     @staticmethod
     def _sort_unsteady_key(filename):
         # Extracts the integer (cycle number) from the filename
@@ -372,7 +390,7 @@ class zCFD_Result:
         return 0  # Default return value if the pattern is not found
 
 
-class zCFD_Overset_Result(object):
+class zCFD_Overset_Result(zCFD_Result_Base):
     """Class with helper functions for overset result paths"""
 
     def __init__(
@@ -461,10 +479,6 @@ class zCFD_Overset_Result(object):
 
         # get zcfd_started from background case
         self.zcfd_started = self.overset_cases[0].zcfd_started
-
-    def _print(self, message):
-        if self.verbose:
-            print(message)
 
 
 def get_zcfd_result(
@@ -660,3 +674,35 @@ def get_fw_csv_data(
     else:
         data = pd.read_fwf(filename, sep=" ", width=widths, **kwargs)
     return data
+
+
+def _get_logo_path(strapline=False):
+    zcfd_home = Path(__file__).parents[5]
+    if strapline:
+        logo = "ZCFD_Mark_CMYK.png"
+    else:
+        logo = "ZCFD_Mark_CMYK_No_Strapline_trans.png"
+    file_loc = files("zutil").joinpath("assets") / logo
+    return str(file_loc)
+
+
+def _get_average_time_from_file(log_file: str, time_block: str = "solving") -> float:
+    """Extract solve time from zCFD log file"""
+    if not os.path.isfile(log_file):
+        print("File not found: " + str(log_file))
+        return 0.0
+
+    average_solve_time = []
+    with open(log_file, "r") as f:
+        lines = f.readlines()
+        time_pattern = re.compile(
+            r"{}:\s+\d+\s+days\s+\d+\s+hrs\s+\d+\s+mins\s+(\d+)\s+s\s+\(count:\s+\d+\s+cycles,\s+avg:\s+(\d+(?:\.\d+)?)\s+ms\)".format(
+                time_block
+            )
+        )
+        for line in reversed(lines):  # Iterate in reverse to find the last match
+            match = time_pattern.search(line)
+            if match:
+                return float(match.group(2))
+
+    return 0.0  # Default return if no match is found
