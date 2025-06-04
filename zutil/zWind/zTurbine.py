@@ -57,9 +57,7 @@ class zTurbine:
         self.control = control_dict["controller"]
         self.spec = control_dict
 
-        self.rotor_swept_area = np.pi * (
-            self.outer_radius**2 - self.inner_radius**2
-        )
+        self.rotor_swept_area = np.pi * (self.outer_radius**2 - self.inner_radius**2)
 
         self.verbose = control_dict.get("verbose", False)
 

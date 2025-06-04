@@ -677,7 +677,6 @@ def get_fw_csv_data(
 
 
 def _get_logo_path(strapline=False):
-    zcfd_home = Path(__file__).parents[5]
     if strapline:
         logo = "ZCFD_Mark_CMYK.png"
     else:
@@ -692,7 +691,6 @@ def _get_average_time_from_file(log_file: str, time_block: str = "solving") -> f
         print("File not found: " + str(log_file))
         return 0.0
 
-    average_solve_time = []
     with open(log_file, "r") as f:
         lines = f.readlines()
         time_pattern = re.compile(

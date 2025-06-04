@@ -1,7 +1,6 @@
 [lint]
 select = ["E", "W", "ANN", "F"]
-ignore = ["E501", "ANN101", "W605", "ANN002", "ANN003"]
-ignore-init-module-imports = true
+ignore = ["E501", "W605", "ANN002", "ANN003"]
 
 [lint.per-file-ignores]
 # Ignore `E401, E402` (import violations) in all `__init__.py` files.

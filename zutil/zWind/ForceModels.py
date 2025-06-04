@@ -97,11 +97,7 @@ class zTurbineSimpleFixed(zSimpleFixed):
         if omega != 0.0:
             torque = power / omega
             thrust = (
-                0.5
-                * density
-                * u_ref**2
-                * turbine.rotor_swept_area
-                * thrust_coefficient
+                0.5 * density * u_ref**2 * turbine.rotor_swept_area * thrust_coefficient
             )
         else:
             torque = 0.0
@@ -132,7 +128,9 @@ class zPropellorSimpleFixed(zSimpleFixed):
                 cp * density * radps2rps(omega) ** 3 * (turbine.outer_radius * 2) ** 5
             )
             torque = power / omega
-            thrust = ct * radps2rps(omega) ** 2 * (turbine.outer_radius * 2) ** 4
+            thrust = (
+                ct * density * radps2rps(omega) ** 2 * (turbine.outer_radius * 2) ** 4
+            )
         else:
             thrust = 0.0
             power = 0.0

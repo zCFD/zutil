@@ -1,1 +1,1 @@
-from zutil import *
+from zutil import *  # noqa

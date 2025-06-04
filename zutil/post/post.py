@@ -36,7 +36,6 @@ import paraview.simple as pvs
 from builtins import object
 from builtins import range
 from builtins import str
-from future import standard_library
 from typing import Union, Tuple, Optional
 import os
 from zutil.fileutils import clean_name
@@ -47,7 +46,6 @@ import matplotlib.image as image
 from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from zutil.fileutils import _get_logo_path
 
-standard_library.install_aliases()
 # from paraview.vtk.util import numpy_support
 try:
     from paraview.vtk.dataset_adapter import Table
