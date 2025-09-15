@@ -65,8 +65,8 @@ try:
     from .post import vtk_logo_stamp
     from .post import vtk_text_stamp
 
-    pv.compatibility.major = 5
-    pv.compatibility.minor = 4
+    pv.compatibility.major = 6
+    pv.compatibility.minor = 0
     pvs._DisableFirstRenderCameraReset()
 except ImportError:
     # check if in zCFD environment

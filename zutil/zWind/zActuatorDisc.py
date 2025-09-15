@@ -150,6 +150,9 @@ class zActuactorDisc:
                 seg.segment_centre[0],
                 seg.segment_centre[1],
                 seg.segment_centre[2],
+                seg.da * seg.disc_normal[0],
+                seg.da * seg.disc_normal[1],
+                seg.da * seg.disc_normal[2],
             )
             for seg in self.annulus
         ]

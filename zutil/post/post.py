@@ -584,7 +584,7 @@ def slice_metric(
     chord_calc = pvs.Calculator(Input=slice)
     chord_calc.AttributeType = "Point Data"
     chord_calc.Function = (
-        "(coords.iHat - " + str(offset[0]) + ")/" + str(offset[1] - offset[0])
+        "(coordsX - " + str(offset[0]) + ")/" + str(offset[1] - offset[0])
     )
     chord_calc.ResultArrayName = "chord"
 

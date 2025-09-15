@@ -36,6 +36,7 @@ import pandas as pd
 from typing import Optional, Union
 import re
 from importlib.resources import files
+import numpy as np
 
 
 class zCFD_Report(object):
@@ -74,6 +75,37 @@ class zCFD_Report(object):
                 # if append_index > 0:
                 #    append_str = '_'+str(append_index)
                 self.residual_list.append(h + append_str)
+
+    def get_array(self, array_name: str, DTS_filter: bool = True) -> list[float]:
+        """Get an array from a zCFD report file
+
+        Args:
+            array_name (str): Name of the array to retrieve
+            DTS_filter (bool = True): If True, return only the last value per psuedo time step
+        """
+
+        # check if array exists
+        if array_name not in self.header_list:
+            raise ValueError(
+                "Array {} not found in report file {}".format(
+                    array_name, self.header_list
+                )
+            )
+        else:
+            # get the array from the report data
+            array = self.data[array_name].to_numpy()
+
+            if DTS_filter:
+                real_time_step = self.data["RealTimeStep"].to_numpy()
+                indices = np.where(real_time_step[1:] != real_time_step[:-1])[0]
+                indices = np.append(indices, len(real_time_step) - 1)
+                filtered_array = array[indices]
+                return filtered_array.tolist()
+            else:
+                return array.tolist()
+        raise Exception(
+            "An unknown error occurred while retrieving array {}".format(array_name)
+        )
 
 
 class zCFD_Result_Base(object):
@@ -117,6 +149,7 @@ class zCFD_Result(zCFD_Result_Base):
         self._log_file_path = Path()
         self._checkpoint_path = Path()
         self._mesh_path = Path()
+        self._acoustic_data_path = Path()
 
         # boundary file paths- resolve to strings
         self._wall_boundary_path = Path()
@@ -141,6 +174,7 @@ class zCFD_Result(zCFD_Result_Base):
         self.log_file_path: str
         self.checkpoint_path: str
         self.mesh_path: str
+        self._acoustic_data_path: str
 
         # boundary file paths- resolve to strings
         self.wall_boundary_path: str
@@ -162,6 +196,7 @@ class zCFD_Result(zCFD_Result_Base):
         self.absolute = True
         self.rotating = False
         self.translating = False
+        self.acoustic = False
 
         # ints
         self.num_procs: int
@@ -171,6 +206,7 @@ class zCFD_Result(zCFD_Result_Base):
         self.immersed_wall_paths: list = []
         self.fwh_permeable_paths: list = []
         self.rank_report_paths: list = []
+        self.microphone_data_paths: list = []
 
         # data objects
         self.report: zCFD_Report
@@ -212,6 +248,7 @@ class zCFD_Result(zCFD_Result_Base):
             self._check_steady_state()
             self._check_rotating()
             self._check_translating()
+            self._check_acoustic()
 
             self._status_file_path = Path(
                 self._data_dir, self._control_file_stem + "_status.txt"
@@ -256,6 +293,11 @@ class zCFD_Result(zCFD_Result_Base):
                     self.translating = True
                     return
 
+    def _check_acoustic(self):
+        """checks if we're performing an acoustic simulation, if so sets paths to microphone data"""
+        if self.parameters.get("equations", "").upper() == "DGCAA":
+            self.acoustic = True
+
     def _init_paths(self):
         """initialise paths to the various zCFD files"""
         self._print("initialising paths")
@@ -284,6 +326,18 @@ class zCFD_Result(zCFD_Result_Base):
         self._volume_file_path = Path(
             self._output_directory_path, self._control_file_stem + ".pvd"
         )
+
+        if self.acoustic:
+            self._acoustic_data_path = Path(
+                self._output_directory_path / "ACOUSTIC_DATA"
+            )
+            # set paths to microphone data
+            num_mics = len(self.parameters.get("report").get("monitor").keys())
+            for i in range(num_mics):
+                mic_name = self.control_file_stem + "_MP" + str(i + 1) + "_mic.dat"
+                self.microphone_data_paths.append(
+                    self.acoustic_data_path + "/" + mic_name
+                )
 
         self._log_file_path = Path(self._data_dir, self._control_file_stem + ".log")
         self._get_rank_log_paths()
@@ -628,9 +682,12 @@ def get_zone_info(zone_dict_name: str) -> dict:
         ImportError: If the module cannot be imported or does not contain a dictionary.
         ValueError: If the imported module does not contain a dictionary.
     """
+    # Ensure the zone_dict_name has a .py extension for filename- ensures backwards compatibility
+    if not zone_dict_name.endswith(".py"):
+        zone_dict_name += ".py"
 
     try:
-        zone_module = importlib.import_module(zone_dict_name)
+        zone_module = load_module_from_file(zone_dict_name, zone_dict_name)
         return zone_module
     except ImportError as e:
         raise ImportError(
@@ -704,3 +761,35 @@ def _get_average_time_from_file(log_file: str, time_block: str = "solving") -> f
                 return float(match.group(2))
 
     return 0.0  # Default return if no match is found
+
+
+def load_module_from_file(module_name: str, file_path: str):
+    """Load a Python module from a file path without modifying sys.path.
+
+    Args:
+        module_name: Name to give the loaded module
+        file_path: Absolute path to the Python file
+
+    Returns:
+        The loaded module object
+
+    Raises:
+        ImportError: If the module cannot be loaded
+    """
+    spec = importlib.util.spec_from_file_location(module_name, file_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Could not load module from {file_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def read_CAA_file(filepath) -> tuple[list, list]:
+    """Read a CAA .dat file and return frequency and PSD data"""
+    # Read the file and extract data
+    data = pd.read_csv(filepath, sep="\s+")
+    time = data["Time"].to_list()
+    p = data["p"].to_list()
+
+    return p, time

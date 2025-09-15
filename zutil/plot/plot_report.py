@@ -275,6 +275,7 @@ class Report(zCFD_Result):
                     rolling = self.report.data.rolling(self.rolling_avg).mean()
                     fig, ax = _forces_plot(self.report, var)
                     _rolling_avg(rolling, var, ax)
+                    ax.grid(True)
                     fig.savefig(f"{self.control_file_stem}_{var}.png")
                     print(f"... Saved {self.control_file_stem}_{var}.png")
 
@@ -336,6 +337,7 @@ class Report(zCFD_Result):
                     y = cb.description
                     fig, ax = _forces_plot(self.report, y)
                     _rolling_avg(rolling, y, ax)
+                    ax.grid(True)
                     self.visible_fig.append(fig)
                     plt.show()
 

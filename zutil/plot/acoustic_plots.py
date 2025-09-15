@@ -47,6 +47,8 @@ from zutil.analysis.acoustic import (
     convert_to_dB,
 )
 
+from zutil.fileutils import read_CAA_file
+
 
 def plot_thirdoctave(
     p: list,
@@ -55,6 +57,7 @@ def plot_thirdoctave(
     title: str = "Third Octave Band Data",
     label: Optional[str] = None,
     ax: Optional[plt.Axes] = None,
+    A_weighting: bool = False,
 ) -> plt.Axes:
     """
     Plots third-octave band data for given observer data.
@@ -67,6 +70,7 @@ def plot_thirdoctave(
         title (str): Title of the plot.
         label (str): Label for the plot.
         ax (plt.Axes): Matplotlib Axes object to plot on. If None, a new figure is created.
+        A_weighting (bool = False): If True, apply A-weighting to the bands.
     """
     # Initialize figure and set labels
 
@@ -85,7 +89,9 @@ def plot_thirdoctave(
 
     # calculate Power Spectral Density (PSD) using Welch's method
     f1, Pxx_den1 = calculate_PSD(p, time, sampling_frequency=sampling_frequency)
-    third_octave_freq, third_octave_data = calculate_thirdoctave_bands(f1, Pxx_den1)
+    third_octave_freq, third_octave_data = calculate_thirdoctave_bands(
+        f1, Pxx_den1, A_weighting=A_weighting
+    )
     third_octave_data_db = convert_to_dB(third_octave_data)
 
     # Plot third-octave data for the current lifter
@@ -160,6 +166,7 @@ def plot_PSD(
     title: str = "PSD",
     label: Optional[str] = None,
     ax: Optional[plt.Axes] = None,
+    db_offset=None,
 ) -> plt.Axes:
     """
     Plots Power Spectral Density (PSD) for given observer data.
@@ -195,6 +202,9 @@ def plot_PSD(
     # Compute and plot Power Spectral Density (PSD) for p
     f, Pxx_den = calculate_PSD(p, T, sampling_frequency)
     Pxx_den_db = convert_to_dB(Pxx_den)
+
+    if db_offset:
+        Pxx_den_db = [val + db_offset for val in Pxx_den_db]
 
     ax.semilogx(f, Pxx_den_db, label=label)  # Plot on a logarithmic scale
 
@@ -288,3 +298,38 @@ def plot_all_thirdoctave(
 
     plt.legend()
     plt.show()
+
+
+def plot_CAA_PSD(
+    filepath: str,
+    sampling_frequency: float = 1.0,
+    title: str = "CAA PSD",
+    stamp=False,
+    label=None,
+    ax=None,
+    db_offset=None,
+) -> plt.Axes:
+    """
+    Plot all PSDs from a given CAA observer file
+
+    Args:
+        filepath (str): Path to the file containing observer data.
+        sampling_frequency (float): Sampling frequency in Hz.
+    """
+    p, time = read_CAA_file(filepath)
+    ax = plot_PSD(
+        p,
+        time,
+        sampling_frequency=sampling_frequency,
+        label=label,
+        ax=ax,
+        title=title,
+        db_offset=db_offset,
+    )
+
+    if stamp:
+        plt_logo_stamp(ax, location=(0.1, 0.9))
+    plt.legend()
+    plt.show()
+
+    return ax
