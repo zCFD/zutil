@@ -733,11 +733,17 @@ def get_fw_csv_data(
     return data
 
 
-def _get_logo_path(strapline=False):
+def _get_logo_path(strapline=False, invert=False):
+    logo = "ZCFD"
     if strapline:
-        logo = "ZCFD_Mark_CMYK.png"
+        logo += "_STRAPLINE"
     else:
-        logo = "ZCFD_Mark_CMYK_No_Strapline_trans.png"
+        logo += "_NO_STRAPLINE"
+    if invert:
+        logo += "_WHITE"
+    else:
+        logo += "_CMYK"
+    logo += ".png"
     file_loc = files("zutil").joinpath("assets") / logo
     return str(file_loc)
 
