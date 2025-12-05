@@ -6,6 +6,9 @@ name: Upload Python Package
 on:
   release:
     types: [created, published, released]
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       tag:
@@ -41,7 +44,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
         with:
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
+          ref: ${{ github.event.release.tag_name || github.ref_name || inputs.tag }}
 
       - name: Set up Python
         uses: actions/setup-python@v6
@@ -54,6 +57,14 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ inputs.tag }}"
             TEST_PYPI="${{ inputs.test_pypi }}"
+          elif [ "${{ github.event_name }}" = "push" ]; then
+            TAG="${{ github.ref_name }}"
+            # Check if this is a test release (tag ends with -test)
+            if [[ "$TAG" == *"-test" ]]; then
+              TEST_PYPI="true"
+            else
+              TEST_PYPI="false"
+            fi
           else
             TAG="${{ github.event.release.tag_name }}"
             # Check if this is a test release (tag ends with -test)
