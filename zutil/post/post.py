@@ -247,7 +247,11 @@ def calc_force_wall(
 
 
 def vtk_logo_stamp(
-    input: any, location="Upper Left Corner", logo_file=None, strapline=False
+    input: any,
+    location="Upper Left Corner",
+    logo_file=None,
+    strapline=False,
+    invert=False,
 ):
     """stamps a render view with a zcfd logo
     Inputs:
@@ -262,7 +266,7 @@ def vtk_logo_stamp(
     if logo_file:
         logo_path = logo_file
     else:
-        logo_path = _get_logo_path(strapline)
+        logo_path = _get_logo_path(strapline, invert)
 
     logo_texture = pvs.CreateTexture(logo_path)
     logo1.Texture = logo_texture
@@ -276,7 +280,7 @@ def vtk_logo_stamp(
 def vtk_text_stamp(
     input: any,
     text_str: str,
-    fontsize=40,
+    fontsize=50,
     color=[1.0, 1.0, 1.0],
     location="Lower Left Corner",
     bold=False,
