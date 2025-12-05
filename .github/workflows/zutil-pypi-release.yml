@@ -98,7 +98,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tag_name: ${{ steps.get_tag.outputs.tag_name }}
-          release_name: zUtil ${{ steps.get_tag.outputs.tag_name }}${{ steps.get_tag.outputs.test_mode == 'true' && ' (TEST)' || '' }}
+          release_name: ${{ steps.get_tag.outputs.tag_name }}${{ steps.get_tag.outputs.test_mode == 'true' && ' (TEST)' || '' }}
           body: |
             ## zUtil Release ${{ steps.get_tag.outputs.tag_name }}${{ steps.get_tag.outputs.test_mode == 'true' && ' (TEST)' || '' }}
             
