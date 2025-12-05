@@ -5,7 +5,7 @@ name: Upload Python Package
 
 on:
   release:
-    types: [created, published]
+    types: [created, published, released]
   workflow_dispatch:
     inputs:
       tag:
@@ -28,6 +28,16 @@ jobs:
       id-token: write  # Required for trusted publishing
 
     steps:
+      - name: Debug release event
+        run: |
+          echo "🔍 Release event debugging:"
+          echo "Event name: ${{ github.event_name }}"
+          echo "Event action: ${{ github.event.action }}"
+          echo "Release tag: ${{ github.event.release.tag_name }}"
+          echo "Release draft: ${{ github.event.release.draft }}"
+          echo "Release prerelease: ${{ github.event.release.prerelease }}"
+          echo "Release published: ${{ github.event.release.published_at }}"
+
       - name: Checkout code
         uses: actions/checkout@v5
         with:
@@ -46,8 +56,8 @@ jobs:
             TEST_PYPI="${{ inputs.test_pypi }}"
           else
             TAG="${{ github.event.release.tag_name }}"
-            # Check if this is a test release (draft or prerelease)
-            if [ "${{ github.event.release.draft }}" = "true" ] || [ "${{ github.event.release.prerelease }}" = "true" ]; then
+            # Check if this is a test release (tag ends with -test)
+            if [[ "$TAG" == *"-test" ]]; then
               TEST_PYPI="true"
             else
               TEST_PYPI="false"
