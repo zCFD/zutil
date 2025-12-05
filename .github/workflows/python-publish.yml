@@ -1,86 +1,29 @@
-# This workflow uploads a Python Package to PyPI when a GitHub release is created
-# It works together with the copybara workflow that creates the release after code sync
+# This workflows will upload a Python Package using Twine when a release is created
+# For more information see: https://help.github.com/en/actions/language-and-framework-guides/using-python-with-github-actions#publishing-to-package-registries
 
 name: Upload Python Package
-
 on:
   release:
-    types: [created, published]
-  workflow_dispatch:
-    inputs:
-      tag:
-        description: 'Release tag (e.g., v2024.12.1)'
-        required: true
-        type: string
-      test_pypi:
-        description: 'Publish to Test PyPI instead of production'
-        required: false
-        type: boolean
-        default: false
-
+    types: [created]
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    environment:
-      name: pypi
-      url: https://pypi.org/p/zutil
     permissions:
-      id-token: write  # Required for trusted publishing
-
+      id-token: write
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v5
-        with:
-          ref: ${{ github.event.release.tag_name || inputs.tag }}
-
+      - uses: actions/checkout@v5
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
           python-version: "3.x"
-
-      - name: Extract version from tag
-        id: get_version
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            TAG="${{ inputs.tag }}"
-            TEST_PYPI="${{ inputs.test_pypi }}"
-          else
-            TAG="${{ github.event.release.tag_name }}"
-            # Check if this is a test release (draft or prerelease)
-            if [ "${{ github.event.release.draft }}" = "true" ] || [ "${{ github.event.release.prerelease }}" = "true" ]; then
-              TEST_PYPI="true"
-            else
-              TEST_PYPI="false"
-            fi
-          fi
-          echo "tag_name=$TAG" >> $GITHUB_OUTPUT
-          echo "test_pypi=$TEST_PYPI" >> $GITHUB_OUTPUT
-          echo "Building version from tag: $TAG (Test PyPI: $TEST_PYPI)"
-
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
           pip install setuptools wheel get-version --upgrade
-
-      - name: Build package
+      - name: Build and publish
         env:
-          RELEASE_VERSION: ${{ steps.get_version.outputs.tag_name }}
+          RELEASE_VERSION: ${{ github.event.release.tag_name }}
         run: |
-          echo "📦 Building package for release: $RELEASE_VERSION"
           python setup.py sdist bdist_wheel
-
-      - name: Verify package
-        run: |
-          echo "🔍 Checking built package"
-          pip install twine
-          python -m twine check dist/*
-          
-          # Show package contents
-          echo "📋 Package contents:"
-          ls -la dist/
-
       - name: Publish package distributions to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          verbose: true
-          repository-url: ${{ steps.get_version.outputs.test_pypi == 'true' && 'https://test.pypi.org/legacy/' || '' }}
