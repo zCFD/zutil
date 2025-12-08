@@ -1,5 +1,4 @@
 # This workflow uploads a Python Package to PyPI when a GitHub release is created
-# It works together with the copybara workflow that creates the release after code sync
 
 name: Upload Python Package
 
