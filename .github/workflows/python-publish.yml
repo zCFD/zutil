@@ -72,9 +72,8 @@ jobs:
             fi
           fi
           
-          # Extract clean version: remove 'v' prefix and '-test' suffix
+          # Extract clean version: remove '-test' suffix but keep 'v' prefix
           VERSION="$TAG"
-          VERSION="${VERSION#v}"        # Remove 'v' prefix
           VERSION="${VERSION%-test}"    # Remove '-test' suffix
           
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
