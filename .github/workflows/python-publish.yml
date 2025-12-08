@@ -12,17 +12,10 @@ on:
         description: 'Release tag (e.g., v2024.12.1)'
         required: true
         type: string
-      test_pypi:
-        description: 'Publish to Test PyPI instead of production'
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write  # Required for trusted publishing
 
     steps:
       - name: Debug release event
@@ -50,33 +43,13 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ inputs.tag }}"
-            TEST_PYPI="${{ inputs.test_pypi }}"
-          elif [ "${{ github.event_name }}" = "push" ]; then
-            TAG="${{ github.ref_name }}"
-            # Check if this is a test release (tag ends with -test)
-            if [[ "$TAG" == *"-test" ]]; then
-              TEST_PYPI="true"
-            else
-              TEST_PYPI="false"
-            fi
           else
             TAG="${{ github.event.release.tag_name }}"
-            # Check if this is a test release (tag ends with -test)
-            if [[ "$TAG" == *"-test" ]]; then
-              TEST_PYPI="true"
-            else
-              TEST_PYPI="false"
-            fi
           fi
           
-          # Extract clean version: remove '-test' suffix but keep 'v' prefix
-          VERSION="$TAG"
-          VERSION="${VERSION%-test}"    # Remove '-test' suffix
-          
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "test_pypi=$TEST_PYPI" >> $GITHUB_OUTPUT
-          echo "Building version from tag: $TAG -> clean version: $VERSION (Test PyPI: $TEST_PYPI)"
+          echo "version=$TAG" >> $GITHUB_OUTPUT
+          echo "Building version from tag: $TAG"
 
       - name: Install dependencies
         run: |
@@ -104,4 +77,4 @@ jobs:
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
           verbose: true
-          repository-url: ${{ steps.get_version.outputs.test_pypi == 'true' && 'https://test.pypi.org/legacy/' || '' }}
+          password: ${{ secrets.PYPI_API_TOKEN }}

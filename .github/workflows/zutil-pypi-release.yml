@@ -10,16 +10,6 @@ on:
         description: 'Release tag (e.g., v2024.12.1)'
         required: true
         type: string
-      test_mode:
-        description: 'Test mode - creates draft release and test tag'
-        required: false
-        type: boolean
-        default: false
-      pypi_test:
-        description: 'Publish to Test PyPI instead of production'
-        required: false
-        type: boolean
-        default: false
 
 jobs:
   create-release:
@@ -41,10 +31,6 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
             TAG="${{ inputs.tag }}"
-            if [ "${{ inputs.test_mode }}" = "true" ]; then
-              # Add test suffix for test mode
-              TAG="${TAG}-test"
-            fi
           else
             # Extract tag from PR branch name (e.g., release/v2024.12.1 -> v2024.12.1)
             TAG="${{ github.head_ref }}"
@@ -52,8 +38,6 @@ jobs:
           fi
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
           echo "version=${TAG#v}" >> $GITHUB_OUTPUT
-          echo "test_mode=${{ inputs.test_mode || 'false' }}" >> $GITHUB_OUTPUT
-          echo "pypi_test=${{ inputs.pypi_test || 'false' }}" >> $GITHUB_OUTPUT
           echo "Processing release: $TAG"
 
       - name: Verify version consistency
@@ -66,7 +50,6 @@ jobs:
           echo "✅ Version will be set via RELEASE_VERSION environment variable during build"
 
       - name: Create and push Git tag
-        if: steps.get_tag.outputs.test_mode != 'true'
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
@@ -80,48 +63,31 @@ jobs:
             echo "Created and pushed tag: ${{ steps.get_tag.outputs.tag_name }}"
           fi
 
-      - name: Create test Git tag
-        if: steps.get_tag.outputs.test_mode == 'true'
-        run: |
-          git config user.name "GitHub Actions"
-          git config user.email "actions@github.com"
-          
-          echo "🧪 Test mode: Creating temporary test tag"
-          # Force create/update the test tag (will be cleaned up)
-          git tag -f ${{ steps.get_tag.outputs.tag_name }}
-          git push -f origin ${{ steps.get_tag.outputs.tag_name }}
-          echo "Created test tag: ${{ steps.get_tag.outputs.tag_name }}"
-
       - name: Create GitHub Release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.ZUTIL_REPO_TOKEN }}
         with:
           tag_name: ${{ steps.get_tag.outputs.tag_name }}
-          release_name: ${{ steps.get_tag.outputs.tag_name }}${{ steps.get_tag.outputs.test_mode == 'true' && ' (TEST)' || '' }}
+          release_name: zUtil ${{ steps.get_tag.outputs.tag_name }}
           body: |
-            ## zUtil Release ${{ steps.get_tag.outputs.tag_name }}${{ steps.get_tag.outputs.test_mode == 'true' && ' (TEST)' || '' }}
+            ## zUtil Release ${{ steps.get_tag.outputs.tag_name }}
             
-            ${{ steps.get_tag.outputs.test_mode == 'true' && '🧪 **This is a TEST release for validation purposes**' || '🎉 This release will be automatically published to PyPI!' }}
+            🎉 This release will be automatically published to PyPI!
             
             ### Install this version:
             ```bash
-            ${{ steps.get_tag.outputs.pypi_test == 'true' && 'pip install --index-url https://test.pypi.org/simple/ zutil==' || 'pip install zutil==' }}${{ steps.get_tag.outputs.version }}
+            pip install zutil==${{ steps.get_tag.outputs.version }}
             ```
             
             ### Changes:
             This release was automatically synced from the zCFD repository.
             
-            ${{ steps.get_tag.outputs.test_mode == 'true' && 'The PyPI package will be published to Test PyPI for validation.' || 'The PyPI package will be built and published automatically by the existing python-publish.yml workflow.' }}
-          draft: ${{ steps.get_tag.outputs.test_mode == 'true' }}
-          prerelease: ${{ steps.get_tag.outputs.test_mode == 'true' }}
+            The PyPI package will be built and published automatically by the existing python-publish.yml workflow.
+          draft: false
+          prerelease: false
 
-      - name: Cleanup test tag
-        if: steps.get_tag.outputs.test_mode == 'true'
-        run: |
-          echo "🧹 Test mode: Cleaning up test tag after 5 minutes"
-          sleep 300  # Wait 5 minutes for testing
-          git push origin --delete ${{ steps.get_tag.outputs.tag_name }} || echo "Test tag already cleaned up"
+
 
       - name: Cleanup release branch
         if: github.event.pull_request.merged == true
