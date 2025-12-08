@@ -5,10 +5,7 @@ name: Upload Python Package
 
 on:
   release:
-    types: [created, published, released]
-  push:
-    tags:
-      - 'v*'
+    types: [released]
   workflow_dispatch:
     inputs:
       tag:
@@ -74,9 +71,16 @@ jobs:
               TEST_PYPI="false"
             fi
           fi
+          
+          # Extract clean version: remove 'v' prefix and '-test' suffix
+          VERSION="$TAG"
+          VERSION="${VERSION#v}"        # Remove 'v' prefix
+          VERSION="${VERSION%-test}"    # Remove '-test' suffix
+          
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "test_pypi=$TEST_PYPI" >> $GITHUB_OUTPUT
-          echo "Building version from tag: $TAG (Test PyPI: $TEST_PYPI)"
+          echo "Building version from tag: $TAG -> clean version: $VERSION (Test PyPI: $TEST_PYPI)"
 
       - name: Install dependencies
         run: |
@@ -85,7 +89,7 @@ jobs:
 
       - name: Build package
         env:
-          RELEASE_VERSION: ${{ steps.get_version.outputs.tag_name }}
+          RELEASE_VERSION: ${{ steps.get_version.outputs.version }}
         run: |
           echo "📦 Building package for release: $RELEASE_VERSION"
           python setup.py sdist bdist_wheel
