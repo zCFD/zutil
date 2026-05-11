@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g., v2024.12.1)'
+        description: "Release tag (e.g., v2024.12.1)"
         required: true
         type: string
 
@@ -22,7 +22,7 @@ jobs:
       github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: main
 
@@ -44,7 +44,7 @@ jobs:
         run: |
           VERSION="${{ steps.get_tag.outputs.version }}"
           echo "Expected version: $VERSION"
-          
+
           # The setup.py uses RELEASE_VERSION environment variable, so we just need to verify
           # that the code was properly synced. We can check for any version files if they exist.
           echo "✅ Version will be set via RELEASE_VERSION environment variable during build"
@@ -53,7 +53,7 @@ jobs:
         run: |
           git config user.name "GitHub Actions"
           git config user.email "actions@github.com"
-          
+
           # Check if tag already exists
           if git rev-parse "${{ steps.get_tag.outputs.tag_name }}" >/dev/null 2>&1; then
             echo "Tag ${{ steps.get_tag.outputs.tag_name }} already exists, skipping tag creation"
@@ -69,25 +69,23 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.ZUTIL_REPO_TOKEN }}
         with:
           tag_name: ${{ steps.get_tag.outputs.tag_name }}
-          release_name: zUtil ${{ steps.get_tag.outputs.tag_name }}
+          release_name: ${{ steps.get_tag.outputs.tag_name }}
           body: |
-            ## zUtil Release ${{ steps.get_tag.outputs.tag_name }}
-            
+            ## Release ${{ steps.get_tag.outputs.tag_name }}
+
             🎉 This release will be automatically published to PyPI!
-            
+
             ### Install this version:
             ```bash
             pip install zutil==${{ steps.get_tag.outputs.version }}
             ```
-            
+
             ### Changes:
             This release was automatically synced from the zCFD repository.
-            
+
             The PyPI package will be built and published automatically by the existing python-publish.yml workflow.
           draft: false
           prerelease: false
-
-
 
       - name: Cleanup release branch
         if: github.event.pull_request.merged == true
