@@ -47,8 +47,6 @@ from zutil.analysis.acoustic import (
     convert_to_dB,
 )
 
-from zutil.fileutils import read_CAA_file
-
 
 def plot_thirdoctave(
     p: list,
@@ -298,38 +296,3 @@ def plot_all_thirdoctave(
 
     plt.legend()
     plt.show()
-
-
-def plot_CAA_PSD(
-    filepath: str,
-    sampling_frequency: float = 1.0,
-    title: str = "CAA PSD",
-    stamp=False,
-    label=None,
-    ax=None,
-    db_offset=None,
-) -> plt.Axes:
-    """
-    Plot all PSDs from a given CAA observer file
-
-    Args:
-        filepath (str): Path to the file containing observer data.
-        sampling_frequency (float): Sampling frequency in Hz.
-    """
-    p, time = read_CAA_file(filepath)
-    ax = plot_PSD(
-        p,
-        time,
-        sampling_frequency=sampling_frequency,
-        label=label,
-        ax=ax,
-        title=title,
-        db_offset=db_offset,
-    )
-
-    if stamp:
-        plt_logo_stamp(ax, location=(0.1, 0.9))
-    plt.legend()
-    plt.show()
-
-    return ax
