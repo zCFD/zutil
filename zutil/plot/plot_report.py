@@ -35,7 +35,6 @@ from IPython.display import display
 import pandas as pd
 import re
 from zutil.fileutils import (
-    zCFD_Result,
     get_zcfd_result,
     zCFD_Result,
     zCFD_Overset_Result,
@@ -43,7 +42,6 @@ from zutil.fileutils import (
 )
 from zutil.analysis.acoustic import calculate_PSD
 from zutil.plot import plot_PSD, plot_thirdoctave
-from pathlib import Path
 from typing import Optional
 import warnings
 from matplotlib.axes import Axes
