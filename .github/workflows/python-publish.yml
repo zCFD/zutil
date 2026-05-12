@@ -8,7 +8,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'Release tag (e.g., v2024.12.1)'
+        description: "Release tag (e.g., v2024.12.1)"
         required: true
         type: string
 
@@ -30,7 +30,7 @@ jobs:
           echo "Release published: ${{ github.event.release.published_at }}"
 
       - name: Checkout code
-        uses: actions/checkout@v5
+        uses: actions/checkout@v6
         with:
           ref: ${{ github.event.release.tag_name || github.ref_name || inputs.tag }}
 
@@ -47,7 +47,7 @@ jobs:
           else
             TAG="${{ github.event.release.tag_name }}"
           fi
-          
+
           echo "tag_name=$TAG" >> $GITHUB_OUTPUT
           echo "version=$TAG" >> $GITHUB_OUTPUT
           echo "Building version from tag: $TAG"
@@ -69,7 +69,7 @@ jobs:
           echo "🔍 Checking built package"
           pip install twine
           python -m twine check dist/*
-          
+
           # Show package contents
           echo "📋 Package contents:"
           ls -la dist/
