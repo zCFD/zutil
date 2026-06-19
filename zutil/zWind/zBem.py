@@ -221,7 +221,7 @@ class zTurbineBetFull(zTurbineBetBase):
         dt = (F_L * np.cos(theta_rel) - F_D * np.sin(theta_rel)) * seg.da
         dq = (F_L * np.sin(theta_rel) + F_D * np.cos(theta_rel)) * seg.da
 
-        if self.kind == "propellor":
+        if self.kind == "turbine":
             dq *= -1
             dt *= -1
         if turbine.rotation_direction == "anticlockwise":
