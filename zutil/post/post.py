@@ -37,13 +37,8 @@ from builtins import object
 from builtins import range
 from builtins import str
 from typing import Union, Tuple, Optional
-import os
 from zutil.fileutils import clean_name
 from zutil.fileutils import get_csv_data
-import pandas as pd
-from pathlib import Path
-import matplotlib.image as image
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from zutil.fileutils import _get_logo_path
 
 # from paraview.vtk.util import numpy_support
@@ -52,7 +47,6 @@ try:
     from paraview.vtk.dataset_adapter import DataSet
     from paraview.vtk.dataset_adapter import PointSet
 except ImportError:
-    from paraview.vtk.numpy_interface.dataset_adapter import Table
     from paraview.vtk.numpy_interface.dataset_adapter import DataSet
     from paraview.vtk.numpy_interface.dataset_adapter import PointSet
 

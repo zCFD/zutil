@@ -61,6 +61,10 @@ class zTurbine:
 
         self.verbose = control_dict.get("verbose", False)
 
+        self.u_ref = None
+        if "u_ref" in control_dict:
+            self.u_ref = control_dict["u_ref"]
+
         self.assign_model()
         self.assign_controller()
 
