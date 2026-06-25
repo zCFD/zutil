@@ -59,13 +59,20 @@ class zCFD_Report(object):
             self.restart_data = get_csv_data(restart_file, header=True).dropna(
                 axis=1, how="all"
             )
-            # Get first entry in new data
-            restart_cycle = self.data["Cycle"].iloc[0]
-            self.restart_data = self.restart_data[
-                self.restart_data["Cycle"] < restart_cycle
-            ]
-            # Merge restart data with data
-            self.data = pd.concat([self.restart_data, self.data], ignore_index=True)
+            if (
+                not self.data.empty
+                and "Cycle" in self.data.columns
+                and "Cycle" in self.restart_data.columns
+            ):
+                # Get first entry in new data
+                restart_cycle = self.data["Cycle"].iloc[0]
+                self.restart_data = self.restart_data[
+                    self.restart_data["Cycle"] < restart_cycle
+                ]
+                # Merge restart data with data
+                self.data = pd.concat([self.restart_data, self.data], ignore_index=True)
+            elif self.data.empty:
+                self.data = self.restart_data
 
         self.header_list: list[str] = list(self.data)
         self.residual_list = []
@@ -149,7 +156,6 @@ class zCFD_Result(zCFD_Result_Base):
         self._log_file_path = Path()
         self._checkpoint_path = Path()
         self._mesh_path = Path()
-        self._acoustic_data_path = Path()
 
         # boundary file paths- resolve to strings
         self._wall_boundary_path = Path()
@@ -174,7 +180,6 @@ class zCFD_Result(zCFD_Result_Base):
         self.log_file_path: str
         self.checkpoint_path: str
         self.mesh_path: str
-        self._acoustic_data_path: str
 
         # boundary file paths- resolve to strings
         self.wall_boundary_path: str
@@ -196,7 +201,6 @@ class zCFD_Result(zCFD_Result_Base):
         self.absolute = True
         self.rotating = False
         self.translating = False
-        self.acoustic = False
 
         # ints
         self.num_procs: int
@@ -206,7 +210,6 @@ class zCFD_Result(zCFD_Result_Base):
         self.immersed_wall_paths: list = []
         self.fwh_permeable_paths: list = []
         self.rank_report_paths: list = []
-        self.microphone_data_paths: list = []
 
         # data objects
         self.report: zCFD_Report
@@ -248,7 +251,6 @@ class zCFD_Result(zCFD_Result_Base):
             self._check_steady_state()
             self._check_rotating()
             self._check_translating()
-            self._check_acoustic()
 
             self._status_file_path = Path(
                 self._data_dir, self._control_file_stem + "_status.txt"
@@ -293,11 +295,6 @@ class zCFD_Result(zCFD_Result_Base):
                     self.translating = True
                     return
 
-    def _check_acoustic(self):
-        """checks if we're performing an acoustic simulation, if so sets paths to microphone data"""
-        if self.parameters.get("equations", "").upper() == "DGCAA":
-            self.acoustic = True
-
     def _init_paths(self):
         """initialise paths to the various zCFD files"""
         self._print("initialising paths")
@@ -324,20 +321,8 @@ class zCFD_Result(zCFD_Result_Base):
         )
 
         self._volume_file_path = Path(
-            self._output_directory_path, self._control_file_stem + ".pvd"
+            self._output_directory_path, self._control_file_stem + ".vtkhdf"
         )
-
-        if self.acoustic:
-            self._acoustic_data_path = Path(
-                self._output_directory_path / "ACOUSTIC_DATA"
-            )
-            # set paths to microphone data
-            num_mics = len(self.parameters.get("report").get("monitor").keys())
-            for i in range(num_mics):
-                mic_name = self.control_file_stem + "_MP" + str(i + 1) + "_mic.dat"
-                self.microphone_data_paths.append(
-                    self.acoustic_data_path + "/" + mic_name
-                )
 
         self._log_file_path = Path(self._data_dir, self._control_file_stem + ".log")
         self._get_rank_log_paths()
@@ -356,26 +341,26 @@ class zCFD_Result(zCFD_Result_Base):
     def _init_boundary_paths(self):
         self._print("getting boundary files")
         self.boundary_files = list(
-            self._output_directory_path.glob(self._control_file_stem + "_*.pvd")
+            self._output_directory_path.glob(self._control_file_stem + "_*.vtkhdf")
         )
 
         for boundary_file in self.boundary_files:
             # big ugly case switch depending on file extension
-            if boundary_file.match("*_symmetry.pvd"):
+            if boundary_file.match("*_symmetry.vtkhdf"):
                 self._symmetry_boundary_path = boundary_file
-            elif boundary_file.match("*_wall.pvd"):
+            elif boundary_file.match("*_wall.vtkhdf"):
                 self._wall_boundary_path = boundary_file
-            elif boundary_file.match("*_immersed wall.pvd"):
+            elif boundary_file.match("*_immersed wall.vtkhdf"):
                 self._immersed_boundary_path = boundary_file
-            elif boundary_file.match("*_farfield.pvd"):
+            elif boundary_file.match("*_farfield.vtkhdf"):
                 self._farfield_boundary_path = boundary_file
-            elif boundary_file.match("*_periodic.pvd"):
+            elif boundary_file.match("*_periodic.vtkhdf"):
                 self._periodic_boundary_path = boundary_file
-            elif boundary_file.match("*_overset.pvd"):
+            elif boundary_file.match("*_overset.vtkhdf"):
                 self._overset_path = boundary_file
-            elif boundary_file.match("*_inflow.pvd"):
+            elif boundary_file.match("*_inflow.vtkhdf"):
                 self._inflow_boundary_path = boundary_file
-            elif boundary_file.match("*_outflow.pvd"):
+            elif boundary_file.match("*_outflow.vtkhdf"):
                 self._outflow_boundary_path = boundary_file
             else:
                 print(
@@ -789,13 +774,3 @@ def load_module_from_file(module_name: str, file_path: str):
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
     return module
-
-
-def read_CAA_file(filepath) -> tuple[list, list]:
-    """Read a CAA .dat file and return frequency and PSD data"""
-    # Read the file and extract data
-    data = pd.read_csv(filepath, sep="\s+")
-    time = data["Time"].to_list()
-    p = data["p"].to_list()
-
-    return p, time
