@@ -121,7 +121,7 @@ def create_turbines(array_data_file, wall_file, volume_file, turbine_only=False)
         array_data = ast.literal_eval(s)
 
     # Read terrain
-    terrain = pvs.PVDReader(FileName=wall_file)
+    terrain = pvs.VTKHDFReader(FileName=wall_file)
     terrain = pvs.CleantoGrid(Input=terrain)
     bounds = terrain.GetDataInformation().GetBounds()
     # Elevation
@@ -142,7 +142,7 @@ def create_turbines(array_data_file, wall_file, volume_file, turbine_only=False)
     probeLocation.Tolerance = 2.22044604925031e-16
 
     # Read volume
-    volume = pvs.PVDReader(FileName=volume_file)
+    volume = pvs.VTKHDFReader(FileName=volume_file)
     volume = pvs.CleantoGrid(Input=volume)
     volume.UpdatePipeline()
     hubProbe = pvs.ProbeLocation(Input=volume, ProbeType="Fixed Radius Point Source")
@@ -620,7 +620,7 @@ def write_windfarmer_data(case_name, num_processes, up):
         + str(num_processes)
         + "_OUTPUT/"
         + case_name
-        + "_wall.pvd"
+        + "_wall.vtkhdf"
     )
     local_surface = pvs.servermanager.Fetch(reader)
 
@@ -1052,7 +1052,7 @@ def extract_probe_data(
         directory = (
             case_name + "_" + str(int(wd)) + "_P" + str(num_processes) + "_OUTPUT"
         )
-        filename = case_name + "_" + str(int(wd)) + ".pvd"
+        filename = case_name + "_" + str(int(wd)) + ".vtkhdf"
         reader = pvs.OpenDataFile("./" + directory + "/" + filename)
         local_volume = pvs.servermanager.Fetch(reader)
         for location in probe_location_array:
