@@ -37,13 +37,8 @@ from builtins import object
 from builtins import range
 from builtins import str
 from typing import Union, Tuple, Optional
-import os
 from zutil.fileutils import clean_name
 from zutil.fileutils import get_csv_data
-import pandas as pd
-from pathlib import Path
-import matplotlib.image as image
-from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 from zutil.fileutils import _get_logo_path
 
 # from paraview.vtk.util import numpy_support
@@ -52,7 +47,6 @@ try:
     from paraview.vtk.dataset_adapter import DataSet
     from paraview.vtk.dataset_adapter import PointSet
 except ImportError:
-    from paraview.vtk.numpy_interface.dataset_adapter import Table
     from paraview.vtk.numpy_interface.dataset_adapter import DataSet
     from paraview.vtk.numpy_interface.dataset_adapter import PointSet
 
@@ -117,7 +111,9 @@ def sum_and_zone_filter(
 ) -> list:
     """Break down vtkMultiBlockDataSet object and sum desired arrays according to filters"""
     sum = [0.0, 0.0, 0.0]
-    if input.IsA("vtkMultiBlockDataSet"):
+    if input.IsA("vtkMultiBlockDataSet") or input.IsA(
+        "vtkPartitionedDataSetCollection"
+    ):
         iter = input.NewIterator()
         iter.UnRegister(None)
         iter.InitTraversal()
@@ -184,11 +180,11 @@ def clean_vtk(
         mergeBlocks: default=True-Whether to perform a mergeBlocks operation on the data
         cellDataToPointData: defult=True- Whether to perform a cellDataToPointData mapping on the object
     """
-    data = pvs.CleantoGrid(Input=vtk_object)
-
     if mergeBlocks:
-        data = pvs.MergeBlocks(Input=data)
-        pvs.UpdatePipeline()
+        data = pvs.MergeBlocks(Input=vtk_object)
+        data = pvs.CleantoGrid(Input=data)
+    else:
+        data = pvs.CleantoGrid(Input=vtk_object)
 
     if cellDataToPointData:
         data = pvs.CellDatatoPointData(Input=data)
@@ -222,7 +218,7 @@ def calc_force_from_file(
     Returns:
         float, float. pressure force and friction force
     """
-    wall = pvs.PVDReader(FileName=file_name)
+    wall = pvs.VTKHDFReader(FileName=file_name)
     wall.UpdatePipeline()
 
     return calc_force(wall, ignore_zone, half_model, filter, kwargs)
@@ -237,7 +233,7 @@ def calc_force_wall(
 ) -> Tuple[float, float]:
     """Calculate pressure and friction forces at wall"""
 
-    wall = pvs.PVDReader(FileName=file_root + "_wall.pvd")
+    wall = pvs.VTKHDFReader(FileName=file_root + "_wall.vtkhdf")
     wall.UpdatePipeline()
 
     force = calc_force(wall, ignore_zone, half_model, filter, **kwargs)
@@ -360,7 +356,7 @@ def calc_moment_wall(
 ) -> Tuple[float, float]:
     """Calculate the pressure and friction moment
 
-    This function requires that the _wall.pvd file contains three cell data arrays
+    This function requires that the _wall.vtkhdf file contains three cell data arrays
     called pressuremomentx, frictionmomentx and zone
 
     Args:
@@ -374,7 +370,7 @@ def calc_moment_wall(
     Returns:
         float, float. pressure force and friction force
     """
-    wall = pvs.PVDReader(FileName=file_root + "_wall.pvd")
+    wall = pvs.VTKHDFReader(FileName=file_root + "_wall.vtkhdf")
     wall.UpdatePipeline()
 
     moment = calc_moment(wall, ignore_zone, half_model, filter, **kwargs)
@@ -507,7 +503,9 @@ def get_monitor_data(file: str, monitor_name: str, var_name: str) -> tuple:
 
 def for_each(surface: any, func: any, **kwargs) -> any:
     """Applies a function "func" to each "surface" vtkMultiBlockDataSet"""
-    if surface.IsA("vtkMultiBlockDataSet"):
+    if surface.IsA("vtkMultiBlockDataSet") or surface.IsA(
+        "vtkPartitionedDataSetCollection"
+    ):
         iter = surface.NewIterator()
         iter.UnRegister(None)
         iter.InitTraversal()
@@ -531,7 +529,7 @@ def cp_profile_wall_from_file(
 ) -> dict:
     """Return chordwise cp profile from wall file"""
 
-    wall = pvs.PVDReader(FileName=file_root)
+    wall = pvs.VTKHDFReader(FileName=file_root)
     clean = clean_vtk(wall)
 
     pvs.Delete(wall)
@@ -637,14 +635,20 @@ def cf_profile_wall_from_file(
     file_root: tuple, slice_normal: tuple, slice_origin: tuple, **kwargs
 ) -> dict:
     """Force coefficient calculation at slice loaction for a file string"""
-    wall = pvs.PVDReader(FileName=file_root + "_wall.pvd")
-    clean = pvs.CleantoGrid(Input=wall)
+    wall = pvs.VTKHDFReader(FileName=file_root + "_wall.vtkhdf")
+    wall.UpdatePipeline()
+    inp_wall = pvs.servermanager.Fetch(wall)
+
+    if inp_wall.IsA("vtkMultiBlockDataSet") or inp_wall.IsA(
+        "vtkPartitionedDataSetCollection"
+    ):
+        merged = pvs.MergeBlocks(Input=wall)
+        clean = pvs.CleantoGrid(Input=merged)
+    else:
+        clean = pvs.CleantoGrid(Input=wall)
+
     clean.UpdatePipeline()
     inp = pvs.servermanager.Fetch(clean)
-    if inp.IsA("vtkMultiBlockDataSet"):
-        inp = pvs.MergeBlocks(Input=clean)
-    else:
-        inp = clean
 
     pvs.Delete(wall)
     del wall

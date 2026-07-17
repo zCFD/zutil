@@ -29,7 +29,6 @@ Module init for ploting zCFD functions- only dependencies are matplotlib, numpy,
 
 import matplotlib
 import matplotlib.pyplot as plt
-from matplotlib.rcsetup import all_backends
 
 import os
 
@@ -47,10 +46,7 @@ matplotlib.rcParams.update({"figure.max_open_warning": 0})
 
 if batch:
     # Script mode- don't render figures in interactive widgets
-    if "Agg" in all_backends:
-        matplotlib.use("Agg")
-    else:
-        matplotlib.use("agg")
+    matplotlib.use("Agg")
     plt.ioff()
 else:
     # Interactive mode- use nbAgg backend
