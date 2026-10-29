@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -55,6 +55,8 @@ else:
 
 # Messy, but ensures compatibility with exisiting test harness structure for now
 from .zplot import get_figure
+from .zplot import get_titled_figure
+from .zplot import HOUSE_COLOUR_CYCLE
 from .zplot import x_label
 from .zplot import y_label
 from .zplot import set_title

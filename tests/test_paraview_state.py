@@ -1,22 +1,21 @@
 """Tests for zutil.paraview_state module."""
 
-import json
 import os
-import textwrap
+import pprint
 from pathlib import Path
+
+import yaml
 
 
 from zutil.paraview_state import (
     _collect_cases,
     _get_case_label,
-    _get_immersed_wall_paths,
     _get_surface_paths,
     _get_volume_path,
     _resolve_path,
     _sanitise_varname,
     generate_all,
     generate_all_state,
-    generate_immersed_wall_state,
     generate_surface_state_for_bctype,
     generate_volume_state,
 )
@@ -30,102 +29,118 @@ from zutil.paraview_state import (
 def _write_control_file(
     directory: Path,
     case_name: str,
-    bc_config: dict,
-    write_output_extra: dict | None = None,
+    models: dict[str, str] | None = None,
 ) -> Path:
-    """Write a minimal zCFD control file that zCFD_Result can parse.
+    """Write a minimal ``config version`` 2 control file that zCFD_Result parses.
 
     Args:
-        write_output_extra: Additional keys to merge into the ``write output``
-            dict (e.g. ``{"immersed boundary surface": [...]}``).  Values are
-            written as their Python repr so they must be JSON-friendly.
+        models: Mapping of model name to mesh name.  More than one entry makes
+            this a multi-model (overset) case.
     """
-    bc_lines = ""
-    for bc_key, bc_val in bc_config.items():
-        bc_lines += f'    "{bc_key}": {bc_val},\n'
+    if models is None:
+        models = {"background": "TestMesh"}
 
-    wo_extra_lines = ""
-    if write_output_extra:
-        for wo_key, wo_val in write_output_extra.items():
-            wo_extra_lines += f'                "{wo_key}": {wo_val!r},\n'
+    solution = {
+        "format": "vtk",
+        "surface variables": ["T", "p"],
+        "volume variables": ["V", "p"],
+    }
 
-    content = textwrap.dedent(f"""\
-        parameters = {{
-            "units": "SI",
-            "equations": "RANS",
-            "RANS": {{"order": "second", "turbulence": {{"model": "sst"}}}},
-            "time marching": {{
-                "unsteady": {{"total time": 1.0, "time step": 1.0, "order": "second"}},
-                "scheme": {{"name": "implicit euler", "stage": 1}},
-                "cfl": 5,
+    parameters = {
+        "config version": 2,
+        "solver": {
+            "equations": {"type": "RANS"},
+            "numerical scheme": {"order": "second", "turbulence": {"model": "sst"}},
+            "fluid properties": {
+                "material": "ideal gas",
+                "gamma": 1.4,
+                "gas constant": 287.0,
+            },
+            "reference conditions": {
+                "IC_1": {
+                    "temperature": 300.0,
+                    "pressure": 101325.0,
+                    "V": {"vector": [1.0, 0.0, 0.0], "Mach": 0.5},
+                }
+            },
+            "initialisation": {"reference": "IC_1", "initial conditions": "IC_1"},
+            "time settings": {"type": "steady"},
+            "convergence control": {
                 "cycles": 100,
-            }},
-            "material": "air",
-            "air": {{"gamma": 1.4, "gas constant": 287.0}},
-            "IC_1": {{"temperature": 300, "pressure": 101325, "V": {{"vector": [1, 0, 0], "Mach": 0.5}}}},
-            "initial": "IC_1",
-            "reference": "IC_1",
-            "write output": {{
-                "format": "vtk",
-                "surface variables": ["T", "p"],
-                "volume variables": ["V", "p"],
-{wo_extra_lines}
-            }},
-            {bc_lines}
-        }}
-    """)
+                "scheme": {"name": "implicit euler", "stage": 1},
+            },
+            "output settings": {"report": {"frequency": 1}, "solution": solution},
+        },
+        "model": {
+            model_name: {
+                "mesh": f"{mesh_name}.h5",
+                "boundary conditions": {
+                    "BC_1": {"zones": [1], "type": "wall", "kind": "no slip"},
+                },
+            }
+            for model_name, mesh_name in models.items()
+        },
+    }
+
     path = directory / f"{case_name}.py"
-    path.write_text(content)
+    path.write_text("parameters = " + pprint.pformat(parameters, width=88) + "\n")
     return path
 
 
 def _write_status_file(
-    directory: Path, case_name: str, mesh_name: str, num_procs: int
+    directory: Path,
+    case_name: str,
+    num_procs: int,
+    model_ordering: list[str] | None = None,
 ) -> Path:
-    """Write a mock status file."""
-    status = {
+    """Write a mock status file — its presence is what marks the case as run."""
+    status: dict = {
         "num processor": num_procs,
         "case": case_name,
-        "mesh": mesh_name,
         "version": "test",
     }
-    path = directory / f"{case_name}_status.txt"
-    path.write_text(json.dumps(status))
+    if model_ordering:
+        # The solver records the model DAG order here, and zCFD_Result uses it
+        # to order the per-model output directories.
+        status["model_ordering"] = list(model_ordering)
+
+    path = directory / f"{case_name}_status.yaml"
+    path.write_text(yaml.safe_dump(status))
     return path
 
 
 def _create_output_dir(
     directory: Path,
     case_name: str,
-    num_procs: int,
     surface_types: list[str],
-    immersed_stl_stems: list[str] | None = None,
-    immersed_cycles: list[int] | None = None,
+    models: dict[str, list[str]] | None = None,
 ) -> Path:
-    """Create mock output directory with volume and surface vtkhdf files.
+    """Create a mock output directory with volume and surface vtkhdf files.
 
     Args:
-        immersed_stl_stems: STL stem names to create mock .vtu files for.
-        immersed_cycles: Cycle numbers for the mock .vtu files.
+        surface_types: Boundary types to create files for in the single-model
+            (flat) layout.
+        models: For a multi-model case, model name -> boundary types.  Each
+            model gets its own subdirectory, which is how zCFD_Result tells
+            overset output from single-model output.
     """
-    output_dir = directory / f"{case_name}_P{num_procs}_OUTPUT"
+    output_dir = directory / f"{case_name}_OUTPUT"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     # Logging directory (required by zCFD_Result)
     (output_dir / "LOGGING").mkdir(exist_ok=True)
 
-    # Volume file
-    (output_dir / f"{case_name}.vtkhdf").touch()
-
-    # Surface files
-    for stype in surface_types:
-        (output_dir / f"{case_name}_{stype}.vtkhdf").touch()
-
-    # Immersed wall .vtu files
-    if immersed_stl_stems and immersed_cycles:
-        for stl_stem in immersed_stl_stems:
-            for cycle in immersed_cycles:
-                (output_dir / f"{stl_stem}_{cycle}.vtu").touch()
+    if models:
+        for model_name, model_surfaces in models.items():
+            model_dir = output_dir / model_name
+            model_dir.mkdir(exist_ok=True)
+            (model_dir / f"{model_name}.vtkhdf").touch()
+            for stype in model_surfaces:
+                (model_dir / f"{model_name}_{stype}.vtkhdf").touch()
+    else:
+        (output_dir / f"{case_name}.vtkhdf").touch()
+        for stype in surface_types:
+            (output_dir / f"{case_name}_{stype}.vtkhdf").touch()
 
     return output_dir
 
@@ -136,81 +151,63 @@ def _setup_single_case(
     mesh_name: str = "TestMesh",
     num_procs: int = 4,
     surface_types: list[str] | None = None,
-    write_output_extra: dict | None = None,
-    immersed_stl_stems: list[str] | None = None,
-    immersed_cycles: list[int] | None = None,
 ) -> Path:
     """Set up a complete single-case mock environment. Returns control file path."""
     if surface_types is None:
         surface_types = ["wall", "farfield"]
 
-    bc_config = {
-        "BC_1": {"zone": [1], "type": "wall", "kind": "noslip"},
-    }
     control = _write_control_file(
-        directory, case_name, bc_config, write_output_extra=write_output_extra
-    )
-    _write_status_file(directory, case_name, mesh_name, num_procs)
-    _create_output_dir(
         directory,
         case_name,
-        num_procs,
-        surface_types,
-        immersed_stl_stems=immersed_stl_stems,
-        immersed_cycles=immersed_cycles,
+        models={"background": mesh_name},
     )
+    _write_status_file(directory, case_name, num_procs)
+    _create_output_dir(directory, case_name, surface_types)
 
     return control
 
 
 def _setup_overset_case(
     directory: Path,
-    cases: dict[str, dict] | None = None,
+    case_name: str = "OversetCase",
+    models: dict[str, dict] | None = None,
+    num_procs: int = 64,
 ) -> Path:
-    """Set up a mock overset case. Returns override file path."""
-    if cases is None:
-        cases = {
-            "Background": {
+    """Set up a mock multi-model (overset) case.
+
+    An overset case is one control file with several ``model`` blocks and one
+    output subdirectory per model.  Returns the control file path.
+    """
+    if models is None:
+        models = {
+            "background": {
                 "mesh": "Background",
-                "nprocs": 64,
                 "surfaces": ["farfield", "wall", "symmetry"],
             },
-            "Rotor": {
+            "rotor": {
                 "mesh": "Rotor",
-                "nprocs": 64,
-                "surfaces": ["overset", "immersed wall"],
+                "surfaces": ["overset", "wall"],
             },
-            "Stator": {
+            "stator": {
                 "mesh": "Stator",
-                "nprocs": 64,
                 "surfaces": ["overset", "wall"],
             },
         }
 
-    # Write control files, status files, and output dirs
-    mesh_case_pairs = []
-    for case_name, cfg in cases.items():
-        bc_config = {
-            "BC_1": {"zone": [1], "type": "wall", "kind": "noslip"},
-        }
-        _write_control_file(directory, case_name, bc_config)
-        _write_status_file(directory, case_name, cfg["mesh"], cfg["nprocs"])
-        _create_output_dir(directory, case_name, cfg["nprocs"], cfg["surfaces"])
-        mesh_case_pairs.append((f"{cfg['mesh']}.h5", f"{case_name}.py"))
+    control = _write_control_file(
+        directory,
+        case_name,
+        models={name: cfg["mesh"] for name, cfg in models.items()},
+    )
+    _write_status_file(directory, case_name, num_procs, model_ordering=list(models))
+    _create_output_dir(
+        directory,
+        case_name,
+        surface_types=[],
+        models={name: cfg["surfaces"] for name, cfg in models.items()},
+    )
 
-    # Write override file
-    pairs_str = ",\n        ".join(f'("{m}", "{c}")' for m, c in mesh_case_pairs)
-    override_content = textwrap.dedent(f"""\
-        override = {{
-            "mesh_case_pair": [
-                {pairs_str},
-            ]
-        }}
-    """)
-    override_file = directory / "override_steady.py"
-    override_file.write_text(override_content)
-
-    return override_file
+    return control
 
 
 # ---------------------------------------------------------------------------
@@ -231,28 +228,28 @@ class TestCollectCases:
             os.chdir(original_cwd)
 
     def test_overset_cases(self, tmp_path: Path):
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            cases = _collect_cases(override)
+            cases = _collect_cases(control)
             assert len(cases) == 3
             labels = [_get_case_label(c) for c in cases]
-            assert "Background" in labels
-            assert "Rotor" in labels
-            assert "Stator" in labels
+            assert "background" in labels
+            assert "rotor" in labels
+            assert "stator" in labels
         finally:
             os.chdir(original_cwd)
 
     def test_overset_cases_preserve_order(self, tmp_path: Path):
-        """Case order should match the mesh_case_pair order in the override."""
-        override = _setup_overset_case(tmp_path)
+        """Case order should match the model order recorded in the status file."""
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            cases = _collect_cases(override)
+            cases = _collect_cases(control)
             labels = [_get_case_label(c) for c in cases]
-            assert labels == ["Background", "Rotor", "Stator"]
+            assert labels == ["background", "rotor", "stator"]
         finally:
             os.chdir(original_cwd)
 
@@ -323,48 +320,31 @@ class TestPathExtraction:
     def test_overset_surfaces_detected(self, tmp_path: Path):
         """Overset boundary files must be detected despite the naming
         inconsistency in zCFD_Result (_overset_path vs _overset_boundary_path)."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            cases = _collect_cases(override)
-            # Rotor and Stator have overset surfaces
+            cases = _collect_cases(control)
+            # rotor and stator have overset surfaces
             for case in cases:
                 label = _get_case_label(case)
                 surfaces = _get_surface_paths(case)
-                if label in ("Rotor", "Stator"):
+                if label in ("rotor", "stator"):
                     assert "overset" in surfaces, (
                         f"{label} should have overset surface detected"
                     )
-                elif label == "Background":
+                elif label == "background":
                     assert "overset" not in surfaces
-        finally:
-            os.chdir(original_cwd)
-
-    def test_immersed_wall_with_space_in_filename(self, tmp_path: Path):
-        """Files with spaces in the name (e.g. 'immersed wall') are detected."""
-        override = _setup_overset_case(tmp_path)
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            cases = _collect_cases(override)
-            for case in cases:
-                label = _get_case_label(case)
-                surfaces = _get_surface_paths(case)
-                if label == "Rotor":
-                    assert "immersed_wall" in surfaces, (
-                        "Rotor should have immersed_wall surface"
-                    )
         finally:
             os.chdir(original_cwd)
 
     def test_surface_paths_are_real_files(self, tmp_path: Path):
         """Every path returned by _get_surface_paths should point to a real file."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            cases = _collect_cases(override)
+            cases = _collect_cases(control)
             for case in cases:
                 for label, path in _get_surface_paths(case).items():
                     assert path.is_file(), (
@@ -381,11 +361,11 @@ class TestPathExtraction:
 
 class TestGenerateVolumeState:
     def test_creates_volume_script(self, tmp_path: Path):
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            cases = _collect_cases(override)
+            cases = _collect_cases(control)
             started = [c for c in cases if c.zcfd_started]
             base_dir = str(tmp_path.resolve())
             script = generate_volume_state(started, tmp_path, base_dir)
@@ -396,20 +376,20 @@ class TestGenerateVolumeState:
             content = script.read_text()
             assert "from paraview.simple import *" in content
             assert "OpenDataFile" in content
-            assert "Background (volume)" in content
-            assert "Rotor (volume)" in content
-            assert "Stator (volume)" in content
+            assert "background (volume)" in content
+            assert "rotor (volume)" in content
+            assert "stator (volume)" in content
         finally:
             os.chdir(original_cwd)
 
 
 class TestGenerateSurfaceState:
     def test_creates_per_bctype_script(self, tmp_path: Path):
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            cases = _collect_cases(override)
+            cases = _collect_cases(control)
             started = [c for c in cases if c.zcfd_started]
             base_dir = str(tmp_path.resolve())
             script = generate_surface_state_for_bctype(
@@ -419,18 +399,18 @@ class TestGenerateSurfaceState:
             assert "wall" in script.name
 
             content = script.read_text()
-            assert "Background (wall)" in content
-            assert "Stator (wall)" in content
+            assert "background (wall)" in content
+            assert "stator (wall)" in content
         finally:
             os.chdir(original_cwd)
 
     def test_creates_overset_surface_script(self, tmp_path: Path):
         """Overset surfaces should produce a script."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            cases = _collect_cases(override)
+            cases = _collect_cases(control)
             started = [c for c in cases if c.zcfd_started]
             base_dir = str(tmp_path.resolve())
             script = generate_surface_state_for_bctype(
@@ -440,19 +420,19 @@ class TestGenerateSurfaceState:
             assert "overset" in script.name
 
             content = script.read_text()
-            assert "Rotor (overset)" in content
-            assert "Stator (overset)" in content
-            # Background has no overset surface
-            assert "Background (overset)" not in content
+            assert "rotor (overset)" in content
+            assert "stator (overset)" in content
+            # background has no overset surface
+            assert "background (overset)" not in content
         finally:
             os.chdir(original_cwd)
 
     def test_returns_none_for_absent_bctype(self, tmp_path: Path):
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            cases = _collect_cases(override)
+            cases = _collect_cases(control)
             started = [c for c in cases if c.zcfd_started]
             base_dir = str(tmp_path.resolve())
             script = generate_surface_state_for_bctype(
@@ -465,11 +445,11 @@ class TestGenerateSurfaceState:
 
 class TestGenerateAllState:
     def test_creates_combined_script(self, tmp_path: Path):
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            cases = _collect_cases(override)
+            cases = _collect_cases(control)
             started = [c for c in cases if c.zcfd_started]
             base_dir = str(tmp_path.resolve())
             script = generate_all_state(started, tmp_path, base_dir)
@@ -478,11 +458,11 @@ class TestGenerateAllState:
 
             content = script.read_text()
             # Volumes
-            assert "Background (volume)" in content
-            assert "Rotor (volume)" in content
+            assert "background (volume)" in content
+            assert "rotor (volume)" in content
             # Surfaces
             assert "overset" in content
-            assert "immersed_wall" in content
+            assert "rotor (wall)" in content
         finally:
             os.chdir(original_cwd)
 
@@ -494,11 +474,11 @@ class TestGenerateAllState:
 
 class TestGenerateAll:
     def test_overset_mode(self, tmp_path: Path):
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            scripts = generate_all(override, output_dir=tmp_path)
+            scripts = generate_all(control, output_dir=tmp_path)
             assert len(scripts) > 0
             script_names = {s.name for s in scripts}
             assert "paraview_view_volumes.py" in script_names
@@ -523,10 +503,7 @@ class TestGenerateAll:
 
     def test_no_output_returns_empty(self, tmp_path: Path):
         """If the solver hasn't run (no status file), return empty list."""
-        bc_config = {
-            "BC_1": {"zone": [1], "type": "wall", "kind": "noslip"},
-        }
-        _write_control_file(tmp_path, "NoRun", bc_config)
+        _write_control_file(tmp_path, "NoRun")
         # No status file → zcfd_started = False
         original_cwd = os.getcwd()
         try:
@@ -547,11 +524,11 @@ class TestGeneratedScriptProperties:
 
     def test_scripts_are_valid_python(self, tmp_path: Path):
         """All generated scripts must be valid Python (syntax check)."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            scripts = generate_all(override, output_dir=tmp_path)
+            scripts = generate_all(control, output_dir=tmp_path)
             for script in scripts:
                 content = script.read_text()
                 compile(content, script.name, "exec")
@@ -560,11 +537,11 @@ class TestGeneratedScriptProperties:
 
     def test_scripts_have_guarded_reset_camera(self, tmp_path: Path):
         """All scripts guard ResetCamera with _loaded_count > 0."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            scripts = generate_all(override, output_dir=tmp_path)
+            scripts = generate_all(control, output_dir=tmp_path)
             for script in scripts:
                 content = script.read_text()
                 assert "_loaded_count" in content
@@ -582,11 +559,11 @@ class TestGeneratedScriptProperties:
 
     def test_scripts_use_try_except_not_isfile(self, tmp_path: Path):
         """Scripts must use try/except (not os.path.isfile) for remote compat."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            scripts = generate_all(override, output_dir=tmp_path)
+            scripts = generate_all(control, output_dir=tmp_path)
             for script in scripts:
                 content = script.read_text()
                 assert "os.path.isfile" not in content, (
@@ -600,11 +577,11 @@ class TestGeneratedScriptProperties:
 
     def test_scripts_have_base_dir_variable(self, tmp_path: Path):
         """Scripts must define _base_dir for remote mount override."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            scripts = generate_all(override, output_dir=tmp_path)
+            scripts = generate_all(control, output_dir=tmp_path)
             for script in scripts:
                 content = script.read_text()
                 assert "_base_dir = " in content, (
@@ -622,11 +599,11 @@ class TestGeneratedScriptProperties:
 
     def test_scripts_create_render_view_upfront(self, tmp_path: Path):
         """Scripts must create the render view before any reader blocks."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            scripts = generate_all(override, output_dir=tmp_path)
+            scripts = generate_all(control, output_dir=tmp_path)
             for script in scripts:
                 content = script.read_text()
                 assert '_render_view = GetActiveViewOrCreate("RenderView")' in content
@@ -643,11 +620,11 @@ class TestGeneratedScriptProperties:
     def test_scripts_use_relative_paths_from_base_dir(self, tmp_path: Path):
         """Paths in generated scripts must be relative to _base_dir,
         not absolute, so changing _base_dir works."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            scripts = generate_all(override, output_dir=tmp_path)
+            scripts = generate_all(control, output_dir=tmp_path)
             for script in scripts:
                 content = script.read_text()
                 for line in content.splitlines():
@@ -664,11 +641,11 @@ class TestGeneratedScriptProperties:
 
     def test_distinct_colours_per_case(self, tmp_path: Path):
         """Each case should get a distinct colour in the generated script."""
-        override = _setup_overset_case(tmp_path)
+        control = _setup_overset_case(tmp_path)
         original_cwd = os.getcwd()
         try:
             os.chdir(tmp_path)
-            scripts = generate_all(override, output_dir=tmp_path)
+            scripts = generate_all(control, output_dir=tmp_path)
             vol_script = [s for s in scripts if s.name == "paraview_view_volumes.py"][0]
             content = vol_script.read_text()
 
@@ -692,7 +669,7 @@ class TestGeneratedScriptProperties:
 class TestUtilities:
     def test_sanitise_varname(self):
         assert _sanitise_varname("Aircraft_steady") == "Aircraft_steady"
-        assert _sanitise_varname("immersed wall") == "immersed_wall"
+        assert _sanitise_varname("mass flow") == "mass_flow"
         assert _sanitise_varname("my-case.py") == "my_case_py"
 
     def test_sanitise_varname_special_chars(self):
@@ -721,152 +698,3 @@ class TestUtilities:
         resolved = _resolve_path(link_file)
         assert "link" not in resolved
         assert "real" in resolved
-
-
-# ---------------------------------------------------------------------------
-#  Tests: interpolated immersed wall surface support
-# ---------------------------------------------------------------------------
-
-
-def _setup_immersed_case(tmp_path: Path) -> Path:
-    """Create a single case with immersed boundary surface output."""
-    return _setup_single_case(
-        tmp_path,
-        case_name="ImmersedCase",
-        surface_types=["wall", "immersed wall"],
-        write_output_extra={
-            "immersed boundary surface": [
-                {"stl": "rotor_blade.stl"},
-                {"stl": "stator_blade.stl"},
-            ],
-        },
-        immersed_stl_stems=["rotor_blade", "stator_blade"],
-        immersed_cycles=[0, 1, 2, 10, 11],
-    )
-
-
-class TestImmersedWallPaths:
-    def test_returns_entries_when_vtu_files_exist(self, tmp_path: Path):
-        control = _setup_immersed_case(tmp_path)
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            cases = _collect_cases(control)
-            entries = _get_immersed_wall_paths(cases[0])
-            assert len(entries) == 2
-            stems = [stem for stem, _ in entries]
-            assert "rotor_blade" in stems
-            assert "stator_blade" in stems
-        finally:
-            os.chdir(original_cwd)
-
-    def test_vtu_files_are_sorted_by_cycle(self, tmp_path: Path):
-        control = _setup_immersed_case(tmp_path)
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            cases = _collect_cases(control)
-            entries = _get_immersed_wall_paths(cases[0])
-            for _, vtu_files in entries:
-                # Extract cycle numbers and check they're sorted
-                import re
-
-                cycles = []
-                for f in vtu_files:
-                    m = re.search(r"_(\d+)\.vtu$", f)
-                    if m:
-                        cycles.append(int(m.group(1)))
-                assert cycles == sorted(cycles)
-        finally:
-            os.chdir(original_cwd)
-
-    def test_returns_empty_when_no_immersed_config(self, tmp_path: Path):
-        control = _setup_single_case(tmp_path)
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            cases = _collect_cases(control)
-            entries = _get_immersed_wall_paths(cases[0])
-            assert entries == []
-        finally:
-            os.chdir(original_cwd)
-
-
-class TestGenerateImmersedWallState:
-    def test_creates_immersed_wall_script(self, tmp_path: Path):
-        control = _setup_immersed_case(tmp_path)
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            cases = _collect_cases(control)
-            started = [c for c in cases if c.zcfd_started]
-            base_dir = str(tmp_path.resolve())
-            script = generate_immersed_wall_state(started, tmp_path, base_dir)
-            assert script is not None
-            assert script.name == "paraview_view_interpolated_stl.py"
-            assert script.exists()
-
-            content = script.read_text()
-            assert "XMLUnstructuredGridReader" in content
-            assert "rotor_blade" in content
-            assert "stator_blade" in content
-        finally:
-            os.chdir(original_cwd)
-
-    def test_returns_none_when_no_immersed_data(self, tmp_path: Path):
-        control = _setup_single_case(tmp_path)
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            cases = _collect_cases(control)
-            started = [c for c in cases if c.zcfd_started]
-            base_dir = str(tmp_path.resolve())
-            script = generate_immersed_wall_state(started, tmp_path, base_dir)
-            assert script is None
-        finally:
-            os.chdir(original_cwd)
-
-    def test_immersed_wall_in_generate_all(self, tmp_path: Path):
-        """generate_all should produce the immersed wall script."""
-        control = _setup_immersed_case(tmp_path)
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            scripts = generate_all(control, output_dir=tmp_path)
-            script_names = {s.name for s in scripts}
-            assert "paraview_view_interpolated_stl.py" in script_names
-        finally:
-            os.chdir(original_cwd)
-
-    def test_immersed_wall_in_all_state_script(self, tmp_path: Path):
-        """generate_all_state should include immersed wall surfaces."""
-        control = _setup_immersed_case(tmp_path)
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            cases = _collect_cases(control)
-            started = [c for c in cases if c.zcfd_started]
-            base_dir = str(tmp_path.resolve())
-            script = generate_all_state(started, tmp_path, base_dir)
-            assert script is not None
-            content = script.read_text()
-            assert "XMLUnstructuredGridReader" in content
-            assert "rotor_blade" in content
-            assert "immersed wall" in content
-        finally:
-            os.chdir(original_cwd)
-
-    def test_generated_immersed_script_is_valid_python(self, tmp_path: Path):
-        control = _setup_immersed_case(tmp_path)
-        original_cwd = os.getcwd()
-        try:
-            os.chdir(tmp_path)
-            cases = _collect_cases(control)
-            started = [c for c in cases if c.zcfd_started]
-            base_dir = str(tmp_path.resolve())
-            script = generate_immersed_wall_state(started, tmp_path, base_dir)
-            assert script is not None
-            content = script.read_text()
-            compile(content, script.name, "exec")
-        finally:
-            os.chdir(original_cwd)

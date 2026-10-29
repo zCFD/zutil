@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,13 +30,35 @@ File I/O utilities
 import importlib
 import os
 from pathlib import Path
-import json
-import glob
 import pandas as pd
 from typing import Optional, Union
 import re
 from importlib.resources import files
 import numpy as np
+
+from zutil.deck_dependencies import (
+    record_executed_file,
+    record_imported_siblings,
+)
+
+
+def report_stems(report_block: dict, key: str) -> dict:
+    """Report-column stem of every entry under ``report[key]``, keyed by its label.
+
+    The solver writes an entry's columns under its ``name`` when the deck
+    sets one and under its label, lower case with spaces as underscores,
+    otherwise (``Report.h``).
+    """
+    from zutil.validate.validation_utils import normalise_key
+
+    block = report_block.get(key)
+    if not isinstance(block, dict):
+        return {}
+    return {
+        label: (entry.get("name") or normalise_key(label))
+        for label, entry in block.items()
+        if isinstance(entry, dict)
+    }
 
 
 class zCFD_Report(object):
@@ -137,13 +159,20 @@ class zCFD_Result_Base(object):
 
 
 class zCFD_Result(zCFD_Result_Base):
-    """helper class for zCFD result files"""
+    """helper class for zCFD result files
+
+    ``parameters`` holds the control-file dict exactly as the deck wrote it
+    (typically space-separated key names). ``normalized_parameters`` holds the
+    solver-facing view (spaces -> underscores, schema keys lowercased) — the
+    same normalisation the launcher applies before the C++ sees the dict.
+    """
 
     def __init__(
         self,
         control_file_path: Optional[str] = None,
         verbose: bool = False,
         absolute=True,
+        model: Optional[str] = None,
     ) -> None:
         # paths
         self._control_file_path = Path()
@@ -162,11 +191,11 @@ class zCFD_Result(zCFD_Result_Base):
         self._symmetry_boundary_path = Path()
         self._farfield_boundary_path = Path()
         self._periodic_boundary_path = Path()
-        self._immersed_boundary_path = Path()
         self._inflow_boundary_path = Path()
         self._outflow_boundary_path = Path()
         self._overset_boundary_path = Path()
         self._fwh_wall_data = Path()
+        self._acoustic_data_path = Path()
 
         # strings
         # paths
@@ -186,7 +215,6 @@ class zCFD_Result(zCFD_Result_Base):
         self.symmetry_boundary_path: str
         self.farfield_boundary_path: str
         self.periodic_boundary_path: str
-        self.immersed_boundary_path: str
         self.inflow_boundary_path: str
         self.outflow_boundary_path: str
         self.overset_boundary_path: str
@@ -207,14 +235,25 @@ class zCFD_Result(zCFD_Result_Base):
 
         # lists
         self.boundary_files: list
-        self.immersed_wall_paths: list = []
         self.fwh_permeable_paths: list = []
         self.rank_report_paths: list = []
 
         # data objects
         self.report: zCFD_Report
         self.parameters: dict
+        self.normalized_parameters: dict
         self.status: dict
+
+        # Per-model scoping: if set, default paths point to this model
+        self._target_model: Optional[str] = model
+
+        # Per-model data (populated by _init_paths when model subdirs detected)
+        self.model_names: list[str] = []
+        self.model_dirs: dict[str, Path] = {}
+        self.model_reports: dict[str, zCFD_Report] = {}
+        self.model_volume_paths: dict[str, Path] = {}
+        self.model_checkpoint_paths: dict[str, Path] = {}
+        self.model_boundary_files: dict[str, list[Path]] = {}
 
         # wizardary to make outside references to path variables resolve to strings
 
@@ -248,12 +287,22 @@ class zCFD_Result(zCFD_Result_Base):
 
             self.parameters = get_parameters_from_file(control_file_path)
 
+            # Local import: zutil.validate pulls in pydantic, which not every
+            # fileutils consumer needs at import time.
+            from zutil.validate.validation_utils import replace_spaces_in_keys
+            from zutil.validate.zcfd_schema import resolve_mesh_settings
+
+            self.normalized_parameters = resolve_mesh_settings(
+                replace_spaces_in_keys(self.parameters)
+            )
+
             self._check_steady_state()
-            self._check_rotating()
-            self._check_translating()
+            kinds = self._motion_kinds()
+            self.rotating = "rotating" in kinds
+            self.translating = "translating" in kinds
 
             self._status_file_path = Path(
-                self._data_dir, self._control_file_stem + "_status.txt"
+                self._data_dir, self._control_file_stem + "_status.yaml"
             )
 
             self.zcfd_started = self._check_status()
@@ -262,67 +311,123 @@ class zCFD_Result(zCFD_Result_Base):
                 self._init_paths()
 
     def _check_steady_state(self):
-        if self.parameters.get("time marching").get("unsteady").get(
-            "total time"
-        ) == self.parameters.get("time marching").get("unsteady").get("time step"):
-            self.steady = True
-        else:
-            self.steady = False
+        if self.normalized_parameters.get("config_version") != 2:
+            raise ValueError(
+                "Legacy configuration detected (config_version != 2). "
+                "Please update to config_version: 2."
+            )
+        time_settings = self.normalized_parameters["solver"]["time_settings"]
+        self.steady = time_settings.get("type") == "steady"
 
-    def _check_rotating(self):
-        """sets true if the fluid domain is rotating"""
-        fz_keys = [key for key in self.parameters.keys() if "FZ_" in key]
-        if len(fz_keys) == 0:
-            self.rotating = False
-        else:
-            for fz in fz_keys:
-                if (self.parameters[fz]["type"] == "rotating") and (
-                    0 in self.parameters[fz]["zone"]
-                ):
-                    self.rotating = True
-                    return
-
-    def _check_translating(self):
-        """sets true if the fluid domain is translating"""
-        fz_keys = [key for key in self.parameters.keys() if "FZ_" in key]
-        if len(fz_keys) == 0:
-            self.translating = False
-        else:
-            for fz in fz_keys:
-                if (self.parameters[fz]["type"] == "translating") and (
-                    0 in self.parameters[fz]["zone"]
-                ):
-                    self.translating = True
-                    return
+    def _motion_kinds(self) -> set:
+        model_block = self.normalized_parameters.get("model", {})
+        if self._target_model and self._target_model in model_block:
+            model_block = {self._target_model: model_block[self._target_model]}
+        kinds = set()
+        for model_dict in model_block.values():
+            if not isinstance(model_dict, dict):
+                continue
+            motion = (model_dict.get("transforms") or {}).get("motion")
+            if isinstance(motion, dict) and motion.get("type") in (
+                "rotating",
+                "translating",
+            ):
+                kinds.add(motion["type"])
+        return kinds
 
     def _init_paths(self):
         """initialise paths to the various zCFD files"""
         self._print("initialising paths")
 
-        self._report_file_path = Path(
-            self._data_dir, self._control_file_stem + "_report.csv"
-        )
-        self.report = zCFD_Report(str(self._report_file_path))
-
         self._status_file_path = Path(
-            self._data_dir, self._control_file_stem + "_status.txt"
-        )
-        self._checkpoint_path = Path(
-            self._data_dir, self._control_file_stem + "_results.h5"
+            self._data_dir, self._control_file_stem + "_status.yaml"
         )
 
-        self._mesh_path = Path(self.status["mesh"] + ".h5")
+        # Extract mesh path from the model block (first model)
+        model_block = self.normalized_parameters.get("model", {})
+        mesh_name = ""
+        for v in model_block.values():
+            if isinstance(v, dict) and "mesh" in v:
+                mesh_name = v["mesh"]
+                break
+        if not mesh_name.endswith(".h5"):
+            mesh_name += ".h5"
+        self._mesh_path = Path(mesh_name)
 
         self.num_procs = self.status["num processor"]
 
         self._output_directory_path = Path(
             self._data_dir,
-            self._control_file_stem + "_P{}_OUTPUT/".format(self.num_procs),
+            self._control_file_stem + "_OUTPUT/",
         )
 
-        self._volume_file_path = Path(
-            self._output_directory_path, self._control_file_stem + ".vtkhdf"
-        )
+        # Detect per-model output directories.
+        # Layout: model subdirectories inside <case>_OUTPUT/
+        # e.g., <case>_OUTPUT/background/, <case>_OUTPUT/cylinder_1/
+        self.model_names = []
+        self.model_dirs = {}
+        self.model_reports = {}
+        self.model_volume_paths = {}
+        self.model_checkpoint_paths = {}
+        self.model_boundary_files = {}
+
+        if self._output_directory_path.exists():
+            # The models are declared by the case: model_ordering from the
+            # status YAML (DAG order set by the solver), falling back to
+            # control file dict order.  A model is present if the solver
+            # created its output subdirectory.
+            dag_order = self.status.get("model_ordering", [])
+            if dag_order:
+                candidate_names = dag_order
+            else:
+                candidate_names = list(self.normalized_parameters.get("model", {}))
+
+            for name in candidate_names:
+                model_dir = self._output_directory_path / name
+                if model_dir.is_dir():
+                    self.model_names.append(name)
+                    self.model_dirs[name] = model_dir
+
+        # Set overset flag if multiple models detected
+        if len(self.model_names) > 1:
+            self.overset = True
+
+        # Populate per-model data
+        # Files within model dirs are named with the model name.
+        for mname in self.model_names:
+            mdir = self.model_dirs[mname]
+            report_path = Path(mdir, mname + "_report.csv")
+            self.model_reports[mname] = zCFD_Report(str(report_path))
+            self.model_volume_paths[mname] = Path(mdir, mname + ".vtkhdf")
+            self.model_checkpoint_paths[mname] = Path(mdir, mname + "_results.h5")
+            self.model_boundary_files[mname] = list(mdir.glob(mname + "_*.vtkhdf"))
+
+        # Pick the model for default paths
+        target_model = self._target_model
+        if target_model and target_model not in self.model_dirs:
+            self._print(f"Warning: target model '{target_model}' not found in output")
+            target_model = None
+
+        if self.model_names:
+            primary = target_model or self.model_names[0]
+            primary_dir = self.model_dirs[primary]
+
+            self._report_file_path = Path(primary_dir, primary + "_report.csv")
+            self._checkpoint_path = Path(primary_dir, primary + "_results.h5")
+            self._volume_file_path = Path(primary_dir, primary + ".vtkhdf")
+        else:
+            # Single-model case: paths are directly in the output directory
+            self._report_file_path = Path(
+                self._data_dir, self._control_file_stem + "_report.csv"
+            )
+            self._checkpoint_path = Path(
+                self._data_dir, self._control_file_stem + "_results.h5"
+            )
+            self._volume_file_path = Path(
+                self._output_directory_path, self._control_file_stem + ".vtkhdf"
+            )
+
+        self.report = zCFD_Report(str(self._report_file_path))
 
         self._log_file_path = Path(self._data_dir, self._control_file_stem + ".log")
         self._get_rank_log_paths()
@@ -340,9 +445,21 @@ class zCFD_Result(zCFD_Result_Base):
 
     def _init_boundary_paths(self):
         self._print("getting boundary files")
-        self.boundary_files = list(
-            self._output_directory_path.glob(self._control_file_stem + "_*.vtkhdf")
-        )
+
+        # Determine where to search and what file stub to use
+        if self.model_names:
+            target = (
+                self._target_model
+                if self._target_model in self.model_dirs
+                else self.model_names[0]
+            )
+            search_dir = self.model_dirs[target]
+            file_stub = target
+        else:
+            search_dir = self._output_directory_path
+            file_stub = str(self._control_file_stem)
+
+        self.boundary_files = list(search_dir.glob(file_stub + "_*.vtkhdf"))
 
         for boundary_file in self.boundary_files:
             # big ugly case switch depending on file extension
@@ -350,14 +467,14 @@ class zCFD_Result(zCFD_Result_Base):
                 self._symmetry_boundary_path = boundary_file
             elif boundary_file.match("*_wall.vtkhdf"):
                 self._wall_boundary_path = boundary_file
-            elif boundary_file.match("*_immersed wall.vtkhdf"):
-                self._immersed_boundary_path = boundary_file
             elif boundary_file.match("*_farfield.vtkhdf"):
                 self._farfield_boundary_path = boundary_file
             elif boundary_file.match("*_periodic.vtkhdf"):
                 self._periodic_boundary_path = boundary_file
             elif boundary_file.match("*_overset.vtkhdf"):
                 self._overset_path = boundary_file
+            elif boundary_file.match("*_sliding.vtkhdf"):
+                self._sliding_path = boundary_file
             elif boundary_file.match("*_inflow.vtkhdf"):
                 self._inflow_boundary_path = boundary_file
             elif boundary_file.match("*_outflow.vtkhdf"):
@@ -367,48 +484,35 @@ class zCFD_Result(zCFD_Result_Base):
                     "error, unrecognised boundary file type: {}".format(boundary_file)
                 )
 
-        # if immersed, check for mapped solutions
-        if self._immersed_boundary_path:
-            immersed_list = self.parameters.get("write output").get(
-                "immersed boundary surface"
-            )
-            if immersed_list:
-                for immersed_zone in immersed_list:
-                    stl_name = Path(immersed_zone["stl"]).stem
-                    # perform regex pattern match of output directory to find all unsteady immersed wall files
-                    immersed_files = glob.glob(
-                        str(self.output_directory_path) + "/" + stl_name + "_[0-9]*.vtu"
-                    )
-                    # sort the files by cycle number (glob will put 11 before 9 etc...)
-                    immersed_files.sort(key=self._sort_unsteady_key)
-
-                    self.immersed_wall_paths.append(immersed_files)
+        write_output = self.normalized_parameters["solver"]["output_settings"].get(
+            "solution", {}
+        )
 
         # set FWH wall data path
-        if self.parameters.get("write output").get("fwh wall data"):
-            self._fwh_wall_data = (
-                self._output_directory_path
-                / "ACOUSTIC_DATA"
-                / (str(self._control_file_stem) + "_wall_FWHData.h5")
-            )
+        has_fwh = False
+        if write_output.get("fwh_wall_data"):
+            has_fwh = True
+            fwh_wall_stub = file_stub + "_wall_FWHData.h5"
+            self._fwh_wall_data = search_dir / "ACOUSTIC_DATA" / fwh_wall_stub
 
         # check for permeable FWH surfaces
-        if self.parameters.get("write output").get("fwh interpolate"):
-            fwh_interpolate_list = self.parameters.get("write output").get(
-                "fwh interpolate"
-            )
+        fwh_interpolate_list = write_output.get("fwh_interpolate")
+        if fwh_interpolate_list:
+            has_fwh = True
             for fwh_interpolate in fwh_interpolate_list:
                 stl_name = Path(fwh_interpolate).stem
                 fwh_name = stl_name + "_FWHData.h5"
-                self.fwh_permeable_paths.append(
-                    self._output_directory_path / "ACOUSTIC_DATA" / fwh_name
-                )
+                self.fwh_permeable_paths.append(search_dir / "ACOUSTIC_DATA" / fwh_name)
+
+        if has_fwh:
+            self._acoustic_data_path = search_dir / "ACOUSTIC_DATA"
 
     def _check_status(self):
-        # Get the status dictionary - this bit is copied from zutil/zutil/post/post.py on Github
         if self._status_file_path.exists():
+            import yaml
+
             with open(self._status_file_path, "r") as f:
-                self.status = json.load(f)
+                self.status = yaml.safe_load(f)
 
             if "problem" in self.status.keys():
                 self.status["mesh"] = self.status["problem"]
@@ -420,6 +524,91 @@ class zCFD_Result(zCFD_Result_Base):
             )
             return False
 
+    def force_prefixes(self) -> dict:
+        """Report-column prefix of every force region, keyed by its dict key.
+
+        A deck with ``{"FR_1": {"name": "wall", ...}}`` writes ``wall_Fx``
+        while one without a name writes ``fr_1_Fx`` (``report_stems``).
+        Post-processing must ask rather than assume: the same case can have
+        either, depending on when it ran.
+        """
+        return report_stems(self._report_block(), "forces")
+
+    def _report_block(self) -> dict:
+        return (
+            self.normalized_parameters.get("solver", {})
+            .get("output_settings", {})
+            .get("report", {})
+        )
+
+    def force_prefix(self, report: Optional[str] = None) -> str:
+        """Report-column prefix of one force region (the only one by default).
+
+        Resolved against the report CSV's own columns where they are readable:
+        a control file edited after the run (adding a ``name``) would otherwise
+        promise a prefix the existing data does not carry.
+        """
+        forces = self._report_block().get("forces", {})
+        if not forces:
+            raise AttributeError(
+                f"No force regions in output_settings.report.forces for "
+                f"{self.case_name}"
+            )
+        if report is None:
+            key = next(iter(forces))
+        elif report in forces:
+            key = report
+        else:
+            raise AttributeError(
+                f"No force region {report!r} in {self.case_name}: have {sorted(forces)}"
+            )
+
+        from zutil.validate.validation_utils import normalise_key
+
+        declared = self.force_prefixes()[key]
+        candidates = list(dict.fromkeys([declared, normalise_key(key)]))
+        try:
+            columns = list(self.report.data.columns)
+        except Exception:
+            return declared
+        for candidate in candidates:
+            if any(col.startswith(f"{candidate}_") for col in columns):
+                return candidate
+        return declared
+
+    def monitor_prefixes(self) -> dict:
+        """Report-column prefix of every monitor point, keyed by its dict key."""
+        return report_stems(self._report_block(), "monitor")
+
+    def get_reference_conditions(self) -> dict:
+        """Extract reference conditions from config_version 2 parameters.
+
+        Lookup order:
+        1. ``solver.initialisation.reference`` → key into ``reference_conditions``
+        2. ``solver.initialisation.initial_conditions`` → key into ``reference_conditions``
+        3. First entry in ``solver.reference_conditions``
+        """
+        solver = self.normalized_parameters.get("solver", {})
+        ref_conditions = solver.get("reference_conditions", {})
+        init_block = solver.get("initialisation", {})
+
+        # 1. Explicit reference key in initialisation block
+        ref_name = init_block.get("reference", "")
+        if ref_name and ref_name in ref_conditions:
+            return ref_conditions[ref_name]
+
+        # 2. Fall back to initial_conditions key
+        ic_name = init_block.get("initial_conditions", "")
+        if ic_name and ic_name in ref_conditions:
+            return ref_conditions[ic_name]
+
+        raise AttributeError(
+            f"No reference conditions found: "
+            f"initialisation.reference='{ref_name}', "
+            f"initialisation.initial_conditions='{ic_name}', "
+            f"reference_conditions keys={list(ref_conditions.keys())}"
+        )
+
     @staticmethod
     def _sort_unsteady_key(filename):
         # Extracts the integer (cycle number) from the filename
@@ -429,101 +618,17 @@ class zCFD_Result(zCFD_Result_Base):
         return 0  # Default return value if the pattern is not found
 
 
-class zCFD_Overset_Result(zCFD_Result_Base):
-    """Class with helper functions for overset result paths"""
-
-    def __init__(
-        self,
-        override_file_path: Optional[str] = None,
-        verbose: bool = False,
-        absolute=True,
-    ) -> None:
-        # paths
-        self._override_file_path = Path()
-        self._override_file_stem = Path()
-        self._log_file_path = Path()
-        self._data_dir = Path()
-
-        # strings
-        # paths
-        self.override_file_path: str
-        self.override_file_stem: str
-        self.log_file_path: str
-        self.data_dir: str
-
-        # bools
-        self.verbose: bool = verbose
-        self.overset = True
-        self.zcfd_started = False
-
-        # ints
-
-        # lists
-        self.overset_cases: list[zCFD_Result]
-
-        # data objects
-        self.override: dict
-
-        # wizardary to make outside references to path variables resolve to strings
-
-        self._all_paths = [
-            attr.lstrip("_")
-            for attr, value in vars(self).items()
-            if isinstance(value, Path)
-        ]
-
-        for path in self._all_paths:
-            setattr(
-                self.__class__,
-                path,
-                property(lambda self, p=path: str(getattr(self, f"_{p}"))),
-            )
-
-        if override_file_path:
-            # check if .py file extension has been removed or not
-            self.read_override_file(override_file_path)
-
-    def read_override_file(self, override_file_path) -> None:
-        override_file_path, valid = check_valid_control_file(override_file_path)
-        if valid:
-            self._override_file_path = override_file_path
-            self._override_file_stem = Path(override_file_path).stem
-            self._data_dir = self._override_file_path.parent
-
-            self.override = get_parameters_from_file(
-                override_file_path, parameters_key="override"
-            )
-
-            self._log_file_path = Path(self.data_dir, self._override_file_stem + ".log")
-
-            self._init_overset_cases()
-
-    def _init_overset_cases(self) -> None:
-        """initialise paths to the various zCFD files"""
-        self._print("initialising paths")
-
-        self.overset_cases = []
-        for pair in self.override["mesh_case_pair"]:
-            control_path = Path(pair[1])
-            if control_path.is_absolute():
-                overset_case = control_path
-            else:
-                overset_case = Path(self._data_dir, control_path)
-
-            self.overset_cases.append(
-                zCFD_Result(str(overset_case), verbose=self.verbose)
-            )
-            # recursively set overset flag to True
-            self.overset_cases[-1].overset = True
-
-        # get zcfd_started from background case
-        self.zcfd_started = self.overset_cases[0].zcfd_started
-
-
 def get_zcfd_result(
-    control_file_path: str, verbose: bool = False, absolute=True
-) -> Union[zCFD_Result, zCFD_Overset_Result]:
-    """function to read the supplied parameters file, identify if it is an overset case and return the appropriate object"""
+    control_file_path: str,
+    verbose: bool = False,
+    absolute=True,
+    model: Optional[str] = None,
+) -> zCFD_Result:
+    """Read the supplied parameters file and return a zCFD_Result object.
+
+    Multi-model (overset) cases are handled natively by zCFD_Result via
+    the model_names / model_dirs / model_reports attributes.
+    """
     control_file_path, valid = check_valid_control_file(control_file_path)
 
     # cache cwd
@@ -535,25 +640,13 @@ def get_zcfd_result(
     control_file_path = control_file_path.name
 
     if valid:
-        # check if overset
-        namespace = _get_namespace_from_file(control_file_path)
-        if namespace.get("override"):
-            result = zCFD_Overset_Result(
-                control_file_path, verbose=verbose, absolute=absolute
-            )
-            os.chdir(cwd)
-            return result
-        elif namespace.get("parameters"):
-            result = zCFD_Result(control_file_path, verbose=verbose, absolute=absolute)
-            os.chdir(cwd)
-            return result
-        else:
-            raise ValueError(
-                "Control file {} does not contain a 'parameters' or 'override' dictionary".format(
-                    control_file_path
-                )
-            )
+        result = zCFD_Result(
+            control_file_path, verbose=verbose, absolute=absolute, model=model
+        )
+        os.chdir(cwd)
+        return result
     else:
+        os.chdir(cwd)
         raise FileNotFoundError(
             "Control file {} could not be found".format(control_file_path)
         )
@@ -561,10 +654,10 @@ def get_zcfd_result(
 
 def get_parameters_from_file(
     control_file_path: Path,
-    parameters_key: str = "parameters",
+    parameters_key: Union[str, list[str]] = "parameters",
     namespace: Optional[dict] = None,
     working_dir: str = ".",
-) -> dict:
+) -> Union[dict, tuple[dict, str]]:
     """
     Loads and executes a Python module file, extracting the 'parameters' attribute
     as a dictionary.
@@ -573,22 +666,95 @@ def get_parameters_from_file(
         control_file_path (Path or str): Path to the Python file containing the
                                          `parameters` dictionary.
     Optional Args:
-        parameters_key (str): The key to extract from the imported module.
+        parameters_key (str or list[str]): The key(s) to extract from the imported module.
+                                           If a list is provided, returns the first found key's value and the key name.
         namespace (dict): The namespace to execute the file in- used to pass variables to the control file.
 
     Returns:
-        dict: The 'parameters' dictionary from the imported module.
+        dict: The 'parameters' dictionary from the imported module (if parameters_key is str).
+        tuple: (dict, key) The dictionary and the key found (if parameters_key is list).
 
     Raises:
         ValueError: If the provided file path does not exist.
         KeyError: If the 'parameters' attribute is not found in the file.
     """
+    import inspect
+
     namespace = namespace or {}
 
-    namespace = _get_namespace_from_file(control_file_path, namespace)
+    # Convert string input to Path and handle relative paths
+    if isinstance(control_file_path, str):
+        if not control_file_path.endswith(".py"):
+            control_file_path += ".py"
+        control_file_path = Path(control_file_path)
+
+    original_path = control_file_path
+
+    # If the path is relative, resolve it relative to the calling file's directory
+    if not control_file_path.is_absolute():
+        caller_file = None
+
+        # Try multiple approaches to find the calling file
+        # 1. Check if namespace has __file__ (preferred for zCFD pattern)
+        if namespace and "__file__" in namespace:
+            caller_file = Path(namespace["__file__"])
+        else:
+            # 2. Inspect call stack to find the caller
+            try:
+                frame = inspect.currentframe()
+                # Walk up the stack to find the first frame that's not in fileutils.py
+                while frame:
+                    frame = frame.f_back
+                    if (
+                        frame
+                        and frame.f_code.co_filename
+                        and "fileutils.py" not in frame.f_code.co_filename
+                    ):
+                        caller_file = Path(frame.f_code.co_filename)
+                        break
+            except:
+                pass
+
+        # 3. If still no caller file found and we have a namespace with globals,
+        #    try to get __file__ from the frame's globals
+        if caller_file is None:
+            try:
+                frame = inspect.currentframe()
+                while frame:
+                    frame = frame.f_back
+                    if (
+                        frame
+                        and frame.f_code.co_filename
+                        and "fileutils.py" not in frame.f_code.co_filename
+                        and "__file__" in frame.f_globals
+                    ):
+                        caller_file = Path(frame.f_globals["__file__"])
+                        break
+            except:
+                pass
+
+        # If we found a caller file, resolve relative to its directory
+        if caller_file and caller_file.exists():
+            caller_dir = caller_file.parent
+            control_file_path = caller_dir / control_file_path
+
+    # Resolve the path to handle any .. or . components
+    control_file_path = control_file_path.resolve()
+
+    namespace = load_config_namespace(control_file_path, namespace)
 
     # check if case is an overset control file
     # Retrieve and return the 'parameters' dictionary from the namespace
+    if isinstance(parameters_key, list):
+        for key in parameters_key:
+            if key in namespace:
+                return namespace[key], key
+        raise KeyError(
+            "The file does not contain any of the following attributes: {}".format(
+                parameters_key
+            )
+        )
+
     try:
         control_dict = namespace[parameters_key]
     except KeyError:
@@ -599,7 +765,7 @@ def get_parameters_from_file(
     return control_dict
 
 
-def _get_namespace_from_file(
+def load_config_namespace(
     control_file_path: Path, namespace: Optional[dict] = None
 ) -> dict:
     """
@@ -615,11 +781,10 @@ def _get_namespace_from_file(
         namespace = {}
         old_file = None
 
-    # Convert string input to Path and ensure file has a .py extension
+    # Ensure control_file_path is a Path object (should already be resolved by caller)
     if isinstance(control_file_path, str):
-        if not control_file_path.endswith(".py"):
-            control_file_path += ".py"
         control_file_path = Path(control_file_path)
+
     namespace["__file__"] = str(control_file_path)
     # Check if the file exists before proceeding
     if not control_file_path.exists():
@@ -630,7 +795,34 @@ def _get_namespace_from_file(
     # Read the file and execute its content in a temporary namespace
     with open(control_file_path, "r") as f:
         control_string = f.read()
-    exec(control_string, namespace)
+
+    # Report this file to any active dependency tracker before executing it:
+    # a deck's includes only become visible by running it, and this is the
+    # one place a deck file is ever exec'd, so nested
+    # get_parameters_from_file chains are captured for free. No-op unless a
+    # caller opened a zutil.deck_dependencies.track_dependencies() block.
+    record_executed_file(control_file_path)
+
+    # Compile with filename to preserve stack frame info for relative imports
+    code = compile(control_string, str(control_file_path), "exec")
+
+    import sys
+
+    script_dir = str(control_file_path.parent.absolute())
+    sys_path_added = False
+    if script_dir not in sys.path:
+        sys.path.insert(0, script_dir)
+        sys_path_added = True
+
+    try:
+        exec(code, namespace)
+        # Helpers the deck pulled in by plain import (the reason script_dir
+        # goes on sys.path at all) are part of what this read executed, but
+        # the import machinery ran them, not us — collect them too.
+        record_imported_siblings(script_dir)
+    finally:
+        if sys_path_added:
+            sys.path.remove(script_dir)
 
     # reset __file__ attribute to its original value
     if old_file:
@@ -667,9 +859,42 @@ def get_zone_info(zone_dict_name: str) -> dict:
         ImportError: If the module cannot be imported or does not contain a dictionary.
         ValueError: If the imported module does not contain a dictionary.
     """
+    import inspect
+
     # Ensure the zone_dict_name has a .py extension for filename- ensures backwards compatibility
     if not zone_dict_name.endswith(".py"):
         zone_dict_name += ".py"
+
+    zone_path = Path(zone_dict_name)
+
+    # If the path is relative, resolve it relative to the calling file's directory
+    if not zone_path.is_absolute():
+        caller_file = None
+
+        # Inspect call stack to find the caller
+        try:
+            frame = inspect.currentframe()
+            # Walk up the stack to find the first frame that's not in fileutils.py
+            while frame:
+                frame = frame.f_back
+                if (
+                    frame
+                    and frame.f_code.co_filename
+                    and "fileutils.py" not in frame.f_code.co_filename
+                ):
+                    caller_file = Path(frame.f_code.co_filename)
+                    break
+        except:
+            pass
+
+        # If we found a caller file, resolve relative to its directory
+        if caller_file and caller_file.exists():
+            caller_dir = caller_file.parent
+            zone_path = caller_dir / zone_path
+
+    # Resolve the path
+    zone_path = zone_path.resolve()
+    zone_dict_name = str(zone_path)
 
     try:
         zone_module = load_module_from_file(zone_dict_name, zone_dict_name)
@@ -698,8 +923,23 @@ def check_valid_control_file(control_file_path_str: str) -> tuple[Path, bool]:
 
 
 def get_csv_data(
-    filename: str, header: bool = False, remote: bool = False, delim: str = " "
+    filename: str, header: bool = False, remote: bool = False, delim: str = None
 ) -> pd.DataFrame:
+    """Read CSV data, auto-detecting delimiter if not specified.
+
+    When ``delim`` is None (default), sniffs the first line to choose
+    between comma and space delimiters. This handles both the legacy
+    space-delimited report format and the modern comma-delimited format.
+    """
+    if delim is None:
+        # Auto-detect: sniff first line for commas
+        try:
+            with open(filename, "r") as f:
+                first_line = f.readline()
+            delim = "," if "," in first_line else " "
+        except Exception:
+            delim = " "  # fallback to legacy default
+
     if not header:
         data = pd.read_csv(filename, sep=delim, header=None)
     else:
