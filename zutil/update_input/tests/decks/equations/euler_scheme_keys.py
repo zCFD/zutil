@@ -1,0 +1,26 @@
+parameters = {
+    "equations": "euler",
+    "euler": {
+        "order": "second",
+        "limiter": "vanalbada",
+        "reconstruction": "umuscl",
+        "inviscid flux scheme": "Roe",
+        "entropy fix": 0.05,
+        "linear gradients": True,
+        "first order cycles": 20,
+        "freeze limiter cycle": 500,
+        "roe low dissipation sensor": "NTS",
+        "roe dissipation sensor minimum": 0.1,
+        "roe entropy fix coefficient": 0.002,
+        "permit backward difference during reconstruction": True,
+        "leastsq gradients": True,
+    },
+    "material": "air",
+    "air": {
+        "gamma": 1.4,
+        "gas constant": 287.0,
+        "Sutherlands const": 110.4,
+        "Prandtl No": 0.72,
+        "Turbulent Prandtl No": 0.9,
+    },
+}

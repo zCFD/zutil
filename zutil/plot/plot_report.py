@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -37,7 +37,6 @@ import re
 from zutil.fileutils import (
     get_zcfd_result,
     zCFD_Result,
-    zCFD_Overset_Result,
     _get_average_time_from_file,
 )
 from zutil.analysis.acoustic import calculate_PSD
@@ -47,24 +46,28 @@ import warnings
 from matplotlib.axes import Axes
 
 
+def inner_convergence_steps(steps: list, max_curves: int) -> list:
+    """The real time steps plot_inner_convergence draws, in plot order."""
+    steps = list(dict.fromkeys(steps))
+    steps = [s for s in steps if s > 0] or steps
+    stride = max(1, len(steps) // max_curves)
+    return steps[::stride]
+
+
 class zCFD_Plots:
     """helper class to produce plots for zCFD report files"""
 
     def __init__(self, control_file_str) -> None:
         self.result = get_zcfd_result(control_file_str)
-
-        if isinstance(self.result, zCFD_Overset_Result):
-            self.overset = True
-        elif isinstance(self.result, zCFD_Result):
-            self.overset = False
-        else:
-            raise ValueError("Unknown result type")
+        self.overset = self.result.overset
 
         self.reports = []
 
-        if self.overset:
-            for result in self.result.overset_cases:
-                self.reports.append(Report(result.control_file_path))
+        if self.result.model_names:
+            for model_name in self.result.model_names:
+                self.reports.append(
+                    Report(self.result.control_file_path, model=model_name)
+                )
         else:
             self.reports.append(Report(self.result.control_file_path))
 
@@ -72,6 +75,13 @@ class zCFD_Plots:
         """Plot residuals for all reports"""
         for report in self.reports:
             report.plot_residuals()
+
+    def plot_inner_convergence(
+        self, variable: Optional[str] = None, max_curves: int = 12
+    ) -> None:
+        """Plot inner cycle convergence for all reports"""
+        for report in self.reports:
+            report.plot_inner_convergence(variable=variable, max_curves=max_curves)
 
     def plot_forces(self, variables=None, mean: int = 20) -> None:
         """Plot forces for all reports"""
@@ -102,12 +112,63 @@ class zCFD_Plots:
         for report in self.reports:
             report.plot_linear_solve_memory_usage()
 
+    def plot_cfl_ramp(self, cycles: int = 1000) -> None:
+        """Plot the active CFL ramp function over a specified number of cycles"""
+        from zcfd.solvers.cfl import CFL
+        import matplotlib.pyplot as plt
+
+        # Find the cfl configuration
+        time_marching = self.parameters.get("time marching", {})
+        cfl_val = None
+        ramp_func = None
+
+        # Check standard locations (steady/unsteady sub-blocks or directly)
+        if "steady" in time_marching and "cfl" in time_marching["steady"]:
+            cfl_config = time_marching["steady"]["cfl"]
+            if isinstance(cfl_config, dict):
+                cfl_val = cfl_config.get("cfl")
+                ramp_func = cfl_config.get("cfl_ramp")
+            else:
+                cfl_val = cfl_config
+        elif "cfl" in time_marching:
+            cfl_val = time_marching["cfl"]
+            ramp_func = time_marching.get("cfl_ramp")
+
+        if cfl_val is None:
+            print("Could not find a valid CFL value in parameters.")
+            return
+
+        cfl_obj = CFL(cfl_val)
+
+        cfl_trace = []
+        cycle_range = range(1, cycles + 1)
+        for cycle in cycle_range:
+            cfl_obj.update(solve_cycle=cycle, real_time_cycle=0, ramp_func=ramp_func)
+            cfl_trace.append(cfl_obj.cfl)
+
+        fig = plt.figure(figsize=(8, 5), dpi=100)
+        ax = fig.gca()
+        ax.plot(cycle_range, cfl_trace, label="CFL")
+
+        ax.set_xlabel("Solve Cycle")
+        ax.set_ylabel("CFL Number")
+        ax.set_title(f"CFL Ramp Profile: {self.control_file_stem}")
+        ax.grid(True)
+        ax.legend()
+
+        if self.batch:
+            fig.savefig(self.control_file_stem + "_cfl_ramp.png", dpi=100)
+
+        plt.show()
+
 
 class Report(zCFD_Result):
     """Extension of zCFD_Result class to add plotting functions"""
 
-    def __init__(self, control_file: Optional[str] = None) -> None:
-        super().__init__(control_file)
+    def __init__(
+        self, control_file: Optional[str] = None, model: Optional[str] = None
+    ) -> None:
+        super().__init__(control_file, model=model)
         self.cb_container = None
         self.button = None
         self.rolling_avg = 100
@@ -232,6 +293,67 @@ class Report(zCFD_Result):
 
         if self.batch:
             fig.savefig(self.control_file_stem + "_residuals.png", dpi=100)
+
+        plt.show()
+        self.visible_fig = []
+
+    def plot_inner_convergence(
+        self, variable: Optional[str] = None, max_curves: int = 12
+    ) -> None:
+        """Plot inner (pseudo time) cycle convergence, one curve per real time step."""
+        data = self.report.data
+        for required in ("RealTimeStep", "InnerCycle"):
+            if required not in data.columns:
+                print(
+                    "No inner cycle data in the report file: '{}' column is "
+                    "missing. This plot needs a dual time stepping run.".format(
+                        required
+                    )
+                )
+                return
+
+        if variable is None:
+            variable = "InnerDrop"
+        if variable not in data.columns:
+            print("'{}' is not a column in the report file".format(variable))
+            return
+
+        logarithmic = variable != "InnerDrop"
+
+        fig = plt.figure(figsize=(8, 5), dpi=100)
+        ax = fig.gca()
+        ax.clear()
+        if logarithmic:
+            ax.set_yscale("log")
+            ax.set_ylabel(variable)
+        else:
+            ax.set_ylabel("orders of magnitude dropped")
+
+        ax.set_xlabel("inner cycle")
+        ax.set_title(self.control_file_stem + " inner convergence")
+
+        steps = list(dict.fromkeys(data["RealTimeStep"].tolist()))
+        shown = inner_convergence_steps(steps, max_curves)
+
+        for step in shown:
+            rows = data[data["RealTimeStep"] == step]
+            ax.plot(
+                rows["InnerCycle"],
+                rows[variable],
+                label="step {}".format(step),
+                alpha=0.7,
+            )
+
+        if len(shown) < len(steps):
+            print("Showing {} of {} real time steps".format(len(shown), len(steps)))
+
+        ax.grid(True, "both")
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        plt.legend(loc="center left", bbox_to_anchor=(1.0, 0.5), fontsize="small")
+
+        if self.batch:
+            fig.savefig(self.control_file_stem + "_inner_convergence.png", dpi=100)
 
         plt.show()
         self.visible_fig = []

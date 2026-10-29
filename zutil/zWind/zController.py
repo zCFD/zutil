@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -91,7 +91,7 @@ class TSRController(ControllerBase):
 
         self.iterative = False
 
-        self.tsr_curve = np.array(controller_dict["tip speed ratio curve"])
+        self.tsr_curve = np.array(controller_dict["tip_speed_ratio_curve"])
 
         self.controller_type = "TSR"
 
@@ -114,27 +114,27 @@ class zControllerDynamic(ControllerBase):
         super().__init__(control_dict)
 
         # turbine properties
-        self.outer_radius = control_dict["outer radius"]
-        self.rated_power = control_dict["rated power"]
+        self.outer_radius = control_dict["outer_radius"]
+        self.rated_power = control_dict["rated_power"]
 
         controller_dict = control_dict["controller"]
 
         # controller properties
-        self.cut_in_speed = controller_dict["cut in speed"]
-        self.cut_out_speed = controller_dict["cut out speed"]
+        self.cut_in_speed = controller_dict["cut_in_speed"]
+        self.cut_out_speed = controller_dict["cut_out_speed"]
 
-        self.rated_power = controller_dict["rated power"]
-        self.tip_speed_limit = controller_dict["tip speed limit"]
+        self.rated_power = controller_dict["rated_power"]
+        self.tip_speed_limit = controller_dict["tip_speed_limit"]
 
-        self.friction_loss = controller_dict["friction loss"]
+        self.friction_loss = controller_dict["friction_loss"]
 
-        self.blade_pitch_step = controller_dict["blade pitch step"]
-        self.blade_pitch_range = controller_dict["blade pitch range"]
-        self.blade_pitch_tol = controller_dict["blade pitch tol"]
+        self.blade_pitch_step = controller_dict["blade_pitch_step"]
+        self.blade_pitch_range = controller_dict["blade_pitch_range"]
+        self.blade_pitch_tol = controller_dict["blade_pitch_tol"]
 
         # initial conditions
-        self.pitch = controller_dict["intial pitch"]
-        self.omega = controller_dict["initial omega"]
+        self.pitch = controller_dict["intial_pitch"]
+        self.omega = controller_dict["initial_omega"]
 
         # conditions from previous step
         self.pitch_old = self.pitch
@@ -180,8 +180,8 @@ class zControllerSchedule(ControllerBase):
 
     def __init__(self, controller_dict: dict) -> None:
         super().__init__(controller_dict)
-        self.pitch_schedule = np.array(controller_dict["pitch schedule"])
-        self.speed_schedule = np.array(controller_dict["speed schedule"])
+        self.pitch_schedule = np.array(controller_dict["pitch_schedule"])
+        self.speed_schedule = np.array(controller_dict["speed_schedule"])
 
         self.cut_in_speed = self.pitch_schedule[0, 0]
         self.cut_out_speed = self.pitch_schedule[-1, 0]

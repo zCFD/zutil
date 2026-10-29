@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -86,7 +86,7 @@ class zTurbineSimpleFixed(zSimpleFixed):
         self.model_type = "Turbine Simple Fixed"
 
         self.power = model_dict["power"]
-        self.thrust_coefficient = model_dict["thrust coefficient"]
+        self.thrust_coefficient = model_dict["thrust_coefficient"]
 
     def get_performance(self, u_ref: float, density: float, turbine: zTurbine) -> tuple:
         thrust_coefficient = self.get_thrust_coefficient(u_ref)
@@ -114,8 +114,8 @@ class zPropellorSimpleFixed(zSimpleFixed):
         super().__init__(model_dict)
         self.model_type = "Propellor Simple Fixed"
 
-        self.thrust_coefficient = model_dict["thrust coefficient"]
-        self.power_coefficient = model_dict["power coefficient"]
+        self.thrust_coefficient = model_dict["thrust_coefficient"]
+        self.power_coefficient = model_dict["power_coefficient"]
 
     def get_performance(self, u_ref: float, density: float, turbine: zTurbine) -> tuple:
         ct = self.get_thrust_coefficient(u_ref)
@@ -146,8 +146,8 @@ class zTurbineSimpleCurve(zTurbineSimpleFixed):
         super().__init__(model_dict)
         self.model_type = "Turbine Simple Curve"
 
-        self.cp_curve = np.array(model_dict["power curve"])
-        self.ct_curve = np.array(model_dict["thrust coefficient curve"])
+        self.cp_curve = np.array(model_dict["power_curve"])
+        self.ct_curve = np.array(model_dict["thrust_coefficient_curve"])
 
     def get_power(self, u_ref: float) -> float:
         return np.interp(
