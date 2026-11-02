@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -40,15 +40,15 @@ class zTurbine:
         self.centre = control_dict["geometry"]["centre"]
         self.up = control_dict["geometry"]["up"]
         self.normal = control_dict["geometry"]["normal"]
-        self.inner_radius = control_dict["geometry"]["inner radius"]
-        self.outer_radius = control_dict["geometry"]["outer radius"]
-        self.reference_plane = control_dict["reference plane"]
+        self.inner_radius = control_dict["geometry"]["inner_radius"]
+        self.outer_radius = control_dict["geometry"]["outer_radius"]
+        self.reference_plane = control_dict["reference_plane"]
 
         # self.refrence_point = control_dict["reference point"]
-        self.update_frequency = control_dict["update frequency"]
+        self.update_frequency = control_dict["update_frequency"]
 
         # Model properties
-        self.rotation_direction = control_dict.get("rotation direction", "clockwise")
+        self.rotation_direction = control_dict.get("rotation_direction", "clockwise")
 
         # Store remaining dictionaries incase they're needed later
         self.discretisation = control_dict["discretisation"]
@@ -77,9 +77,9 @@ class zTurbine:
 
         # switch based on model type to load model
         if self.model_type == "simple":
-            power_model = self.model["power model"]
+            power_model = self.model["power_model"]
             if power_model == "fixed":
-                kind = self.model["kind"]
+                kind = self.model.get("kind")
                 if kind == "turbine":
                     self.turbine_model = ForceModels.zTurbineSimpleFixed(self.model)
                 elif kind == "propellor":
@@ -88,17 +88,26 @@ class zTurbine:
                 self.turbine_model = ForceModels.zTurbineSimpleCurve(self.model)
 
         elif self.model_type == "induction":
-            power_model = self.model["power model"]
+            power_model = self.model["power_model"]
             if power_model == "fixed":
                 self.turbine_model = ForceModels.zTurbineInductionFixed(self.model)
             elif power_model == "curve":
                 self.turbine_model = ForceModels.zTurbineIndutionCurve(self.model)
 
-        # BEMT options
-        elif self.model_type == "BET":
+        # BEMT options. Schema validation lowercases every "type" value
+        # (replace_spaces_in_keys), so match the normalised spelling while
+        # accepting the historic uppercase from unvalidated dicts.
+        elif self.model_type in ("bet", "BET"):
             self.turbine_model = zBem.zTurbineBetFull(self.model)
-        elif self.model_type == "BEMT":
+        elif self.model_type in ("bemt", "BEMT"):
             self.turbine_model = zBem.BEMT_Turbine(self.model)
+
+        if not hasattr(self, "turbine_model"):
+            raise ValueError(
+                f"No turbine force model matched type '{self.model_type}' "
+                f"(power_model={self.model.get('power_model')!r}, "
+                f"kind={self.model.get('kind')!r}) for zone '{self.name}'"
+            )
 
         if self.verbose:
             print("Loaded: {}".format(self.turbine_model.model_type))
@@ -106,7 +115,10 @@ class zTurbine:
     def assign_controller(self) -> None:
         self.controller_type = self.control["type"]
 
-        # switch based on controller type to load controller
+        # switch based on controller type to load controller.
+        # replace_spaces_in_keys() underscores KEYS but only lowercases the
+        # "type"/"kind" VALUES, so the validated value keeps its space:
+        # "tsr curve" (matches the schema Literal), never "tsr_curve".
         if self.controller_type == "fixed":
             self.controller = zController.FixedController(self.control)
         elif self.controller_type == "tsr curve":
@@ -114,7 +126,11 @@ class zTurbine:
         elif self.controller_type == "schedule":
             self.controller = zController.zControllerSchedule(self.control)
         else:
-            self.controller = zController.ControllerBase(self.control)
+            raise ValueError(
+                f"Unknown turbine controller type '{self.controller_type}' "
+                f"for zone '{self.name}' — a silent fallback here previously "
+                f"zeroed all disc forces"
+            )
 
         if self.verbose:
             print("Loaded: {}".format(self.controller.controller_type))

@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -44,6 +44,32 @@ from matplotlib.offsetbox import OffsetImage, AnnotationBbox
 def get_figure(x: int = 8, y: int = 5) -> Figure:
     """Create a matyplotlib Figure of windowsize (x,y)"""
     return plt.figure(figsize=(x, y), dpi=100, facecolor="w", edgecolor=cl.zeno_orange)
+
+
+HOUSE_COLOUR_CYCLE = [
+    cl.zeno_orange,
+    cl.zeno_grey,
+    "#1F77B4",
+    "#2CA02C",
+    "#9467BD",
+    "#8C564B",
+]
+
+
+def get_titled_figure(
+    title: str, subtitle: Optional[str] = None, x: int = 8, y: int = 5
+) -> tuple:
+    """Create a house-style (Figure, Axes): title and optional subtitle top-left, zCFD logo
+    top-right in the figure margin, gridded axes below with the house colour cycle."""
+    fig, ax = plt.subplots(figsize=(x, y), dpi=100, facecolor="w")
+    fig.subplots_adjust(top=0.76, bottom=0.13, left=0.11, right=0.96)
+    fig.text(0.02, 0.96, title, fontsize=14, color=cl.zeno_grey, va="top")
+    if subtitle:
+        fig.text(0.02, 0.90, subtitle, fontsize=11, color=cl.zeno_grey, va="top")
+    ax.grid(True, alpha=0.4)
+    ax.set_prop_cycle(color=HOUSE_COLOUR_CYCLE)
+    plt_logo_stamp(ax, location=(0.94, 1.2))
+    return fig, ax
 
 
 def x_label(ax: Axes, text: str) -> None:
