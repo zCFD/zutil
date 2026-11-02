@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -120,9 +120,9 @@ def create_turbines(array_data_file, wall_file, volume_file, turbine_only=False)
         s = f.read()
         array_data = ast.literal_eval(s)
 
-    # Read terrain
+    # Read terrain. No CleantoGrid: zCFD vtkhdf output carries ghost info
+    # (#5591) and the filter is prohibitively slow on farm-scale grids.
     terrain = pvs.VTKHDFReader(FileName=wall_file)
-    terrain = pvs.CleantoGrid(Input=terrain)
     bounds = terrain.GetDataInformation().GetBounds()
     # Elevation
     elevation = pvs.Elevation(Input=terrain)
@@ -143,7 +143,6 @@ def create_turbines(array_data_file, wall_file, volume_file, turbine_only=False)
 
     # Read volume
     volume = pvs.VTKHDFReader(FileName=volume_file)
-    volume = pvs.CleantoGrid(Input=volume)
     volume.UpdatePipeline()
     hubProbe = pvs.ProbeLocation(Input=volume, ProbeType="Fixed Radius Point Source")
     hubProbe.Tolerance = 2.22044604925031e-16
@@ -614,13 +613,7 @@ def write_windfarmer_data(case_name, num_processes, up):
     # Step 4: Calculate the ground heights at the probe locations by
     # subtracting the local height of the wall
     reader = pvs.OpenDataFile(
-        "./"
-        + case_name
-        + "_P"
-        + str(num_processes)
-        + "_OUTPUT/"
-        + case_name
-        + "_wall.vtkhdf"
+        "./" + case_name + "_OUTPUT/" + case_name + "_wall.vtkhdf"
     )
     local_surface = pvs.servermanager.Fetch(reader)
 
@@ -1049,9 +1042,7 @@ def extract_probe_data(
     probe = vtk.vtkProbeFilter()
     point = vtk.vtkPointSource()
     for wd in range(wind_direction_start, wind_direction_end, wind_direction_step):
-        directory = (
-            case_name + "_" + str(int(wd)) + "_P" + str(num_processes) + "_OUTPUT"
-        )
+        directory = case_name + "_" + str(int(wd)) + "_OUTPUT"
         filename = case_name + "_" + str(int(wd)) + ".vtkhdf"
         reader = pvs.OpenDataFile("./" + directory + "/" + filename)
         local_volume = pvs.servermanager.Fetch(reader)

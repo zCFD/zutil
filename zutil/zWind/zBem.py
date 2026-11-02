@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -36,9 +36,9 @@ class zTurbineBetBase:
     """subclass for blade element propellor model"""
 
     def __init__(self, model_dict: dict) -> None:
-        self.blade_twist = np.array(model_dict["blade twist"])
-        self.blade_chord = np.array(model_dict["blade chord"])
-        aerofoils = model_dict["aerofoil positions"]
+        self.blade_twist = np.array(model_dict["blade_twist"])
+        self.blade_chord = np.array(model_dict["blade_chord"])
+        aerofoils = model_dict["aerofoil_positions"]
 
         self.aerofoil_positions = []
         self.aerofoil_names = []
@@ -49,10 +49,10 @@ class zTurbineBetBase:
 
         self.aerofoils = model_dict["aerofoils"]
 
-        self.tip_loss_correction = model_dict["tip loss correction"]
-        self.tip_loss_correction_r = model_dict["tip loss correction radius"]
+        self.tip_loss_correction = model_dict["tip_loss_correction"]
+        self.tip_loss_correction_r = model_dict["tip_loss_correction_radius"]
 
-        self.n_blades = model_dict["number of blades"]
+        self.n_blades = model_dict["number_of_blades"]
 
         self.kind = model_dict["kind"]
 
@@ -117,9 +117,9 @@ class zTurbineBetBase:
                 )
             else:
                 tlc = 1.0
-            return tlc
         else:
-            return 1.0
+            tlc = 1.0
+        return float(tlc)
 
 
 class zTurbineBetProp(zTurbineBetBase):
@@ -166,7 +166,7 @@ class zTurbineBetFull(zTurbineBetBase):
     def __init__(self, model_dict: dict) -> None:
         super().__init__(model_dict)
 
-        self.n_sections = model_dict["number of sections"]
+        self.n_sections = model_dict["number_of_sections"]
 
         self.sections = np.linspace(0, 1, self.n_sections)
 
@@ -290,19 +290,19 @@ class BEMT_Blade:
         # angular properties of each blade
         self.cone = read_default(model_dict, "cone", 0.0)
         self.pitch = 0.0
-        self.num_elements = model_dict["number of elements"]
+        self.num_elements = model_dict["number_of_elements"]
         self.azimuth = azimuth
 
-        self.blade_axis = np.array(model_dict["blade axis"])
+        self.blade_axis = np.array(model_dict["blade_axis"])
         self.blade_axis[:, 3] += 3.0
         # swap x and z to coincide with atom axis (FOR NOW)
 
         self.blade_axis[:, [1, 3, 2]] = self.blade_axis[:, [3, 2, 1]]
 
-        self.chord = np.array(model_dict["blade chord"])
-        self.twist = np.array(model_dict["blade twist"])
+        self.chord = np.array(model_dict["blade_chord"])
+        self.twist = np.array(model_dict["blade_twist"])
 
-        aerofoils = model_dict["aerofoil positions"]
+        aerofoils = model_dict["aerofoil_positions"]
 
         self.aerofoil_positions = []
         self.aerofoil_names = []
@@ -373,7 +373,7 @@ class BEMT_Turbine:
     def __init__(self, model_dict: dict, verbose: bool = False) -> None:
         self.verbose = verbose
 
-        self.num_blades = model_dict["number of blades"]
+        self.num_blades = model_dict["number_of_blades"]
         self.yaw = read_default(model_dict, "yaw", 0.0)
         self.tilt = read_default(model_dict, "tilt", 0.0)
         self.azimuth_offset = read_default(model_dict, "azimuth", 0.0)

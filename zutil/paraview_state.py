@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,18 +30,17 @@ This module does NOT require ParaView to be installed — it only generates
 Python scripts that use ``paraview.simple``. The generated scripts can then
 be run via ``pvpython`` or loaded inside the ParaView GUI.
 
-Uses :class:`zutil.fileutils.zCFD_Result` and
-:class:`zutil.fileutils.zCFD_Overset_Result` for output file discovery.
+Uses :class:`zutil.fileutils.zCFD_Result` for output file discovery
+(overset cases are handled natively via its model_* attributes).
 
 Usage (CLI)::
 
-    generate_paraview_helpers override_steady.py
-    generate_paraview_helpers -c Aircraft_steady   # single-case mode
+    generate_paraview_helpers Aircraft_steady.py
 
 Usage (Python)::
 
     from zutil.paraview_state import generate_all
-    generate_all("override_steady.py")
+    generate_all("Aircraft_steady.py")
 """
 
 from __future__ import annotations
@@ -53,7 +52,7 @@ import textwrap
 from pathlib import Path
 from typing import Optional
 
-from zutil.fileutils import get_zcfd_result, zCFD_Result, zCFD_Overset_Result
+from zutil.fileutils import get_zcfd_result, zCFD_Result
 
 
 # Boundary type attribute names on zCFD_Result → human-readable label.
@@ -64,7 +63,6 @@ BOUNDARY_ATTRS = {
     "_symmetry_boundary_path": "symmetry",
     "_farfield_boundary_path": "farfield",
     "_periodic_boundary_path": "periodic",
-    "_immersed_boundary_path": "immersed_wall",
     "_inflow_boundary_path": "inflow",
     "_outflow_boundary_path": "outflow",
     "_overset_boundary_path": "overset",
@@ -95,7 +93,14 @@ MESH_COLOURS = [
 
 
 def _get_case_label(result: zCFD_Result) -> str:
-    """Return a human-readable label for a case (the control file stem)."""
+    """Return a human-readable label for a case.
+
+    A multi-model (overset) control file yields one result per model, each
+    scoped to a single model, so the model name is what distinguishes them.
+    Single-model cases are labelled by the control file stem.
+    """
+    if result._target_model:
+        return str(result._target_model)
     return str(result._control_file_stem)
 
 
@@ -123,52 +128,27 @@ def _get_surface_paths(result: zCFD_Result) -> dict[str, Path]:
     return surfaces
 
 
-def _get_immersed_wall_paths(result: zCFD_Result) -> list[tuple[str, list[str]]]:
-    """Return a list of (stl_stem, [vtu_path, ...]) for interpolated immersed
-    wall surfaces that exist on disk.
-
-    Each entry corresponds to one STL surface defined in the control file's
-    ``write output`` → ``immersed boundary surface`` list.  The VTU paths are
-    sorted by cycle number.
-    """
-    entries: list[tuple[str, list[str]]] = []
-    immersed_wall_paths = getattr(result, "immersed_wall_paths", [])
-    if not immersed_wall_paths:
-        return entries
-
-    # Recover the STL stem names from the parameters to pair with the paths
-    immersed_list = result.parameters.get("write output", {}).get(
-        "immersed boundary surface", []
-    )
-    if not immersed_list:
-        return entries
-
-    for i, vtu_files in enumerate(immersed_wall_paths):
-        if not vtu_files:
-            continue
-        if i < len(immersed_list):
-            stl_stem = Path(immersed_list[i]["stl"]).stem
-        else:
-            # Fallback: derive the stem from the first VTU filename
-            stl_stem = Path(vtu_files[0]).stem.rsplit("_", 1)[0]
-        entries.append((stl_stem, vtu_files))
-
-    return entries
-
-
 def _collect_cases(
     control_path: str | Path,
 ) -> list[zCFD_Result]:
     """Return a list of :class:`zCFD_Result` objects for the given control file.
 
-    If *control_path* is an override file (overset), returns one result per
-    mesh.  Otherwise returns a single-element list.
+    A multi-model (overset) control file yields one result per model, each
+    scoped to that model so its volume and boundary paths resolve inside that
+    model's own output directory. Every generator here works per case, so
+    scoping at collection time is what makes all models appear in the
+    generated scripts. Single-model cases yield a single-element list.
     """
     result = get_zcfd_result(str(control_path))
-    if isinstance(result, zCFD_Overset_Result):
-        return result.overset_cases
-    else:
-        return [result]
+
+    # model_names is only populated once the solver has run (_init_paths).
+    if len(getattr(result, "model_names", [])) > 1:
+        return [
+            get_zcfd_result(str(control_path), model=name)
+            for name in result.model_names
+        ]
+
+    return [result]
 
 
 # ---------------------------------------------------------------------------
@@ -225,34 +205,6 @@ def _reader_block(
             {var_name}_display.DiffuseColor = [{r:.3f}, {g:.3f}, {b:.3f}]
             _loaded_count += 1
             print("  Loaded: " + {display_name!r})
-        except Exception as _e:
-            print("  Skipped: " + {display_name!r} + " (" + str(_e) + ")")
-
-    """)
-
-
-def _vtu_reader_block(
-    var_name: str,
-    abs_paths: list[str],
-    display_name: str,
-    colour: tuple,
-    base_dir: str,
-) -> str:
-    """Generate code to open a VTU file series reader and show it."""
-    r, g, b = colour
-    # Build relative path list
-    rel_paths = [os.path.relpath(p, base_dir) for p in abs_paths]
-    return textwrap.dedent(f"""\
-        # --- {display_name} ---
-        _{var_name}_files = [os.path.join(_base_dir, p) for p in {rel_paths!r}]
-        try:
-            {var_name} = XMLUnstructuredGridReader(FileName=_{var_name}_files)
-            UpdatePipeline(proxy={var_name})
-            RenameSource({display_name!r}, {var_name})
-            {var_name}_display = Show({var_name}, _render_view)
-            {var_name}_display.DiffuseColor = [{r:.3f}, {g:.3f}, {b:.3f}]
-            _loaded_count += 1
-            print("  Loaded: " + {display_name!r} + " (" + str(len(_{var_name}_files)) + " timestep(s))")
         except Exception as _e:
             print("  Skipped: " + {display_name!r} + " (" + str(_e) + ")")
 
@@ -370,41 +322,6 @@ def generate_surface_state_for_bctype(
     return script_path
 
 
-def generate_immersed_wall_state(
-    cases: list[zCFD_Result],
-    output_path: Path,
-    base_dir: str,
-    save_pvsm: bool = True,
-) -> Optional[Path]:
-    """Generate a script that loads interpolated immersed wall .vtu surfaces."""
-    all_entries: list[tuple[str, str, list[str]]] = []  # (case_label, stl_stem, files)
-    for case in cases:
-        for stl_stem, vtu_files in _get_immersed_wall_paths(case):
-            all_entries.append((_get_case_label(case), stl_stem, vtu_files))
-
-    if not all_entries:
-        return None
-
-    script_name = "paraview_view_interpolated_stl.py"
-    pvsm_name = "paraview_view_interpolated_stl.pvsm" if save_pvsm else None
-    script_path = output_path / script_name
-
-    lines = [_preamble(script_name, base_dir)]
-    lines.append('print("Loading interpolated STL surfaces...")\n')
-
-    for i, (case_label, stl_stem, vtu_files) in enumerate(all_entries):
-        colour = MESH_COLOURS[i % len(MESH_COLOURS)]
-        var = _sanitise_varname(case_label) + "_" + _sanitise_varname(stl_stem)
-        display = f"{case_label} ({stl_stem})"
-        abs_paths = [str(Path(f).resolve()) for f in vtu_files]
-        lines.append(_vtu_reader_block(var, abs_paths, display, colour, base_dir))
-
-    lines.append(_footer("immersed wall surface(s)", pvsm_path=pvsm_name))
-
-    script_path.write_text("".join(lines))
-    return script_path
-
-
 def generate_all_surfaces_state(
     cases: list[zCFD_Result],
     output_path: Path,
@@ -490,18 +407,6 @@ def generate_all_state(
             display = f"{label} ({bctype})"
             lines.append(_reader_block(var, abs_path, display, colour, base_dir))
 
-    # Interpolated immersed wall surfaces (.vtu series)
-    imm_colour_offset = len(cases)  # offset colours so they don't clash
-    for i, case in enumerate(cases):
-        for stl_stem, vtu_files in _get_immersed_wall_paths(case):
-            lines.append(f'print("\\n=== immersed wall: {stl_stem} ===")\n')
-            colour = MESH_COLOURS[(imm_colour_offset + i) % len(MESH_COLOURS)]
-            label = _get_case_label(case)
-            var = _sanitise_varname(label) + "_" + _sanitise_varname(stl_stem)
-            display = f"{label} ({stl_stem})"
-            abs_paths = [str(Path(f).resolve()) for f in vtu_files]
-            lines.append(_vtu_reader_block(var, abs_paths, display, colour, base_dir))
-
     lines.append(_footer("file(s) total", pvsm_path=pvsm_name))
 
     script_path.write_text("".join(lines))
@@ -521,8 +426,9 @@ def generate_all(
     """Generate all ParaView helper scripts.
 
     Args:
-        control_path: Path to an override ``.py`` file (overset) or a single
-            case control file.
+        control_path: Path to the case control ``.py`` file. Multi-model
+            (overset) cases are a single control file with several ``model``
+            blocks; each model is rendered separately.
         output_dir: Directory in which to write the generated scripts.
             Defaults to the directory containing the control file.
         save_pvsm: If True (default), generated scripts include a
@@ -536,6 +442,7 @@ def generate_all(
     if output_dir is None:
         output_dir = control_path.parent
     output_dir = Path(output_dir).resolve()
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     cases = _collect_cases(control_path)
 
@@ -555,9 +462,7 @@ def generate_all(
         label = _get_case_label(case)
         vol = "yes" if _get_volume_path(case) else "no"
         surfs = ", ".join(sorted(_get_surface_paths(case).keys())) or "none"
-        imm_stems = [stem for stem, _ in _get_immersed_wall_paths(case)]
-        imm_info = f", interpolated_stl=[{', '.join(imm_stems)}]" if imm_stems else ""
-        print(f"  {label}: volume={vol}, surfaces=[{surfs}]{imm_info}")
+        print(f"  {label}: volume={vol}, surfaces=[{surfs}]")
 
     generated: list[Path] = []
 
@@ -589,11 +494,6 @@ def generate_all(
         if path:
             generated.append(path)
 
-    # Interpolated immersed wall surfaces script
-    path = generate_immersed_wall_state(started_cases, output_dir, base_dir, save_pvsm)
-    if path:
-        generated.append(path)
-
     # Everything script
     path = generate_all_state(started_cases, output_dir, base_dir, save_pvsm)
     if path:
@@ -621,22 +521,18 @@ def main() -> None:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=textwrap.dedent("""\
             examples:
-              # Overset case — default generates .pvsm-saving scripts:
-              generate_paraview_helpers override_steady.py
+              # Default generates .pvsm-saving scripts:
+              generate_paraview_helpers Aircraft_steady.py
 
               # Python-only scripts (no SaveState):
-              generate_paraview_helpers --python override_steady.py
-
-              # Single-case mode:
-              generate_paraview_helpers Aircraft_steady.py
+              generate_paraview_helpers --python Aircraft_steady.py
         """),
     )
     parser.add_argument(
         "control_file",
         help=(
-            "Path to the control .py file. For overset cases, pass the override file "
-            "(e.g. override_steady.py). For single cases, pass the case control file "
-            "(e.g. Aircraft_steady.py)."
+            "Path to the case control .py file (e.g. Aircraft_steady.py). "
+            "Multi-model overset cases are rendered one model at a time."
         ),
     )
     parser.add_argument(

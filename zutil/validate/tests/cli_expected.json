@@ -1,0 +1,147 @@
+{
+ "capitalised_bc_type:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [\"boundary conditions\", \"BC_1\"], \"field_name\": \"roughness\", \"field_path\": \"model.background.boundary_conditions.BC_1.roughness\", \"path\": [\"model\", \"background\", \"boundary_conditions\", \"BC_1\", \"roughness\"], \"title\": \"Roughness\", \"display_message\": \"Must be a set of roughness settings.\", \"message\": \"model.background.boundary_conditions.BC_1.roughness: Must be a set of roughness settings.\", \"anchor\": \"reference/model/boundary-conditions/wall/roughness\", \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "capitalised_bc_type:text": {
+  "rc": 1,
+  "stderr": "Configuration validation failed:\ncapitalised_bc_type.py: 1 error\n\n  model \u203a background \u203a boundary conditions \u203a BC_1 \u203a roughness\n    Must be a set of roughness settings.\n    Reference: https://docs.zenotech.com/reference/model/boundary-conditions/wall/roughness\n",
+  "stdout": "Validating zCFD configuration: zutil/zutil/validate/tests/decks/capitalised_bc_type.py\n"
+ },
+ "deck_raises:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [], \"field_name\": \"\", \"display_message\": \"name 'zutil' is not defined\", \"message\": \"name 'zutil' is not defined\", \"field_path\": \"\", \"anchor\": null, \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "deck_raises:text": {
+  "rc": 1,
+  "stderr": "Unexpected error: name 'zutil' is not defined\n",
+  "stdout": "Validating zCFD configuration: testcases/testcases/turbine/turbine_bet.py\n"
+ },
+ "deprecated_dg:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [], \"field_name\": \"\", \"display_message\": \"Configuration validation failed with 1 error(s):\\n  \\u2022 high order and CAA codepaths are deprecated and no longer supported.\", \"message\": \"Configuration validation failed with 1 error(s):\\n  \\u2022 high order and CAA codepaths are deprecated and no longer supported.\", \"field_path\": \"\", \"anchor\": null, \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "deprecated_dg:text": {
+  "rc": 1,
+  "stderr": "Configuration validation failed:\nConfiguration validation failed with 1 error(s):\n  \u2022 high order and CAA codepaths are deprecated and no longer supported.\n",
+  "stdout": "Validating zCFD configuration: zutil/zutil/validate/tests/decks/deprecated_dg.py\n"
+ },
+ "duplicate_keys:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [], \"field_name\": \"\", \"display_message\": \"Duplicate key: 'numerical scheme' and 'numerical_scheme' are the same setting spelt two ways. Use one spelling.\", \"message\": \"Duplicate key: 'numerical scheme' and 'numerical_scheme' are the same setting spelt two ways. Use one spelling.\", \"field_path\": \"\", \"anchor\": null, \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "duplicate_keys:text": {
+  "rc": 1,
+  "stderr": "Configuration error: Duplicate key: 'numerical scheme' and 'numerical_scheme' are the same setting spelt two ways. Use one spelling.\n",
+  "stdout": "Validating zCFD configuration: zutil/zutil/validate/tests/decks/duplicate_keys.py\n"
+ },
+ "invalid:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [\"convergence control\"], \"field_name\": \"cfl_coarse\", \"field_path\": \"solver.convergence_control.cfl.cfl_coarse\", \"path\": [\"solver\", \"convergence_control\", \"cfl\", \"cfl_coarse\"], \"title\": \"CFL Coarse\", \"display_message\": \"'cfl coarse' only applies when solver.numerical scheme.multigrid is set\", \"message\": \"solver.convergence_control.cfl.cfl_coarse: 'cfl coarse' only applies when solver.numerical scheme.multigrid is set\", \"anchor\": \"reference/solver/convergence-control/cfl#cfl-coarse\", \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "invalid:text": {
+  "rc": 1,
+  "stderr": "Configuration validation failed:\ndpw_base.py: 1 error\n\n  solver \u203a convergence control \u203a cfl \u203a cfl coarse\n    'cfl coarse' only applies when solver.numerical scheme.multigrid is set\n    Reference: https://docs.zenotech.com/reference/solver/convergence-control/cfl#cfl-coarse\n",
+  "stdout": "Validating zCFD configuration: testcases/testcases/dpw/dpw_base.py\n"
+ },
+ "legacy:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [], \"field_name\": \"\", \"display_message\": \"Legacy configuration detected (Config Version 0).\\n  'buoyancy_cavity.py' also has legacy validation errors:\\n     extra keys not allowed @ data['incomp viscous']['solve energy']\\n  Please update to 'config_version: 2'. Fix the errors above, then convert it with: update_input buoyancy_cavity.py\", \"message\": \"Legacy configuration detected (Config Version 0).\\n  'buoyancy_cavity.py' also has legacy validation errors:\\n     extra keys not allowed @ data['incomp viscous']['solve energy']\\n  Please update to 'config_version: 2'. Fix the errors above, then convert it with: update_input buoyancy_cavity.py\", \"field_path\": \"\", \"anchor\": null, \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "legacy:text": {
+  "rc": 1,
+  "stderr": "Configuration error: Legacy configuration detected (Config Version 0).\n  'buoyancy_cavity.py' also has legacy validation errors:\n     extra keys not allowed @ data['incomp viscous']['solve energy']\n  Please update to 'config_version: 2'. Fix the errors above, then convert it with: update_input buoyancy_cavity.py\n",
+  "stdout": "Validating zCFD configuration: testcases/testcases/cavity/buoyancy_cavity.py\n"
+ },
+ "missing_file:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [], \"field_name\": \"\", \"display_message\": \"Control file path (<ROOT>/does_not_exist.py) does not exist\", \"message\": \"Control file path (<ROOT>/does_not_exist.py) does not exist\", \"field_path\": \"\", \"anchor\": null, \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "missing_file:text": {
+  "rc": 1,
+  "stderr": "Configuration error: Control file path (<ROOT>/does_not_exist.py) does not exist\n",
+  "stdout": "Validating zCFD configuration: does_not_exist.py\n"
+ },
+ "missing_sections:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [\"solver\"], \"field_name\": \"\", \"field_path\": \"solver\", \"path\": [\"solver\"], \"title\": \"Solver\", \"display_message\": \"Missing required field \\\"Solver\\\"\", \"message\": \"solver: Missing required field \\\"Solver\\\"\", \"anchor\": \"reference/solver\", \"severity\": \"error\"}, {\"nodes\": [\"model\"], \"field_name\": \"\", \"field_path\": \"model\", \"path\": [\"model\"], \"title\": \"Model\", \"display_message\": \"Missing required field \\\"Model\\\"\", \"message\": \"model: Missing required field \\\"Model\\\"\", \"anchor\": \"reference/model\", \"severity\": \"error\"}, {\"nodes\": [], \"field_name\": \"\", \"field_path\": \"mesh_name\", \"path\": [\"mesh_name\"], \"title\": \"Mesh Name\", \"display_message\": \"Unknown key \\\"mesh name\\\".\", \"message\": \"mesh_name: Unknown key \\\"mesh name\\\".\", \"anchor\": \"reference/input-deck\", \"severity\": \"error\"}, {\"nodes\": [], \"field_name\": \"\", \"field_path\": \"solver_settings\", \"path\": [\"solver_settings\"], \"title\": \"Solver Settings\", \"display_message\": \"Unknown key \\\"solver settings\\\".\", \"message\": \"solver_settings: Unknown key \\\"solver settings\\\".\", \"anchor\": \"reference/input-deck\", \"severity\": \"error\"}, {\"nodes\": [], \"field_name\": \"\", \"field_path\": \"equations\", \"path\": [\"equations\"], \"title\": \"Equations\", \"display_message\": \"Unknown key \\\"equations\\\".\", \"message\": \"equations: Unknown key \\\"equations\\\".\", \"anchor\": \"reference/input-deck\", \"severity\": \"error\"}, {\"nodes\": [], \"field_name\": \"\", \"field_path\": \"boundary_conditions\", \"path\": [\"boundary_conditions\"], \"title\": \"Boundary Conditions\", \"display_message\": \"Unknown key \\\"boundary conditions\\\".\", \"message\": \"boundary_conditions: Unknown key \\\"boundary conditions\\\".\", \"anchor\": \"reference/input-deck\", \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "missing_sections:text": {
+  "rc": 1,
+  "stderr": "Configuration validation failed:\nmissing_sections.py: 6 errors\n\n  solver\n    Missing required field \"Solver\"\n    Reference: https://docs.zenotech.com/reference/solver\n\n  model\n    Missing required field \"Model\"\n    Reference: https://docs.zenotech.com/reference/model\n\n  mesh name\n    Unknown key \"mesh name\".\n    Reference: https://docs.zenotech.com/reference/input-deck\n\n  solver settings\n    Unknown key \"solver settings\".\n    Reference: https://docs.zenotech.com/reference/input-deck\n\n  equations\n    Unknown key \"equations\".\n    Reference: https://docs.zenotech.com/reference/input-deck\n\n  boundary conditions\n    Unknown key \"boundary conditions\".\n    Reference: https://docs.zenotech.com/reference/input-deck\n",
+  "stdout": "Validating zCFD configuration: zutil/zutil/validate/tests/decks/missing_sections.py\n"
+ },
+ "no_config_version:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [], \"field_name\": \"\", \"display_message\": \"Legacy configuration detected (Config Version 0).\\n  'no_config_version.py' also has legacy validation errors:\\n     \\u001b[31mequations key has not been specified in parameters dictionary\\u001b[39m\\n  Please update to 'config_version: 2'. Fix the errors above, then convert it with: update_input no_config_version.py\", \"message\": \"Legacy configuration detected (Config Version 0).\\n  'no_config_version.py' also has legacy validation errors:\\n     \\u001b[31mequations key has not been specified in parameters dictionary\\u001b[39m\\n  Please update to 'config_version: 2'. Fix the errors above, then convert it with: update_input no_config_version.py\", \"field_path\": \"\", \"anchor\": null, \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "no_config_version:text": {
+  "rc": 1,
+  "stderr": "Configuration error: Legacy configuration detected (Config Version 0).\n  'no_config_version.py' also has legacy validation errors:\n     \u001b[31mequations key has not been specified in parameters dictionary\u001b[39m\n  Please update to 'config_version: 2'. Fix the errors above, then convert it with: update_input no_config_version.py\n",
+  "stdout": "Validating zCFD configuration: zutil/zutil/validate/tests/decks/no_config_version.py\n"
+ },
+ "no_parameters:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [], \"field_name\": \"\", \"display_message\": \"\\\"The file does not contain any of the following attributes: ['parameters', 'override']\\\"\", \"message\": \"\\\"The file does not contain any of the following attributes: ['parameters', 'override']\\\"\", \"field_path\": \"\", \"anchor\": null, \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "no_parameters:text": {
+  "rc": 1,
+  "stderr": "Unexpected error: \"The file does not contain any of the following attributes: ['parameters', 'override']\"\n",
+  "stdout": "Validating zCFD configuration: testcases/testcases/naca0012/batch_stub.py\n"
+ },
+ "override:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [], \"field_name\": \"\", \"display_message\": \"Overset configuration detected (override file).\\n  Found 1 mesh-case pair(s), 0/1 valid for the legacy system:\\n    background.h5 -> missing_case.py: file not found\\n  Overset configurations are no longer supported in the new schema.\\n  Please migrate to 'config_version: 2' \\u2014 see documentation for migration details.\", \"message\": \"Overset configuration detected (override file).\\n  Found 1 mesh-case pair(s), 0/1 valid for the legacy system:\\n    background.h5 -> missing_case.py: file not found\\n  Overset configurations are no longer supported in the new schema.\\n  Please migrate to 'config_version: 2' \\u2014 see documentation for migration details.\", \"field_path\": \"\", \"anchor\": null, \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "override:text": {
+  "rc": 1,
+  "stderr": "Configuration error: Overset configuration detected (override file).\n  Found 1 mesh-case pair(s), 0/1 valid for the legacy system:\n    background.h5 -> missing_case.py: file not found\n  Overset configurations are no longer supported in the new schema.\n  Please migrate to 'config_version: 2' \u2014 see documentation for migration details.\n",
+  "stdout": "Validating zCFD configuration: zutil/zutil/validate/tests/decks/override_case.py\n"
+ },
+ "unsupported_version:json": {
+  "rc": 1,
+  "stderr": "",
+  "stdout": "{\"valid\": false, \"errors\": [{\"nodes\": [], \"field_name\": \"\", \"display_message\": \"Unsupported configuration version: 3. Supported versions are: 2\", \"message\": \"Unsupported configuration version: 3. Supported versions are: 2\", \"field_path\": \"\", \"anchor\": null, \"severity\": \"error\"}], \"warnings\": []}\n"
+ },
+ "unsupported_version:text": {
+  "rc": 1,
+  "stderr": "Configuration error: Unsupported configuration version: 3. Supported versions are: 2\n",
+  "stdout": "Validating zCFD configuration: zutil/zutil/validate/tests/decks/unsupported_version.py\n"
+ },
+ "valid:json": {
+  "rc": 0,
+  "stderr": "",
+  "stdout": "{\"valid\": true, \"errors\": [], \"warnings\": []}\n"
+ },
+ "valid:text": {
+  "rc": 0,
+  "stderr": "",
+  "stdout": "Validating zCFD configuration: testcases/testcases/naca0012/n0012_449_a0p0_imp.py\nConfiguration validation passed!\n"
+ },
+ "valid_verbose:text": {
+  "rc": 0,
+  "stderr": "",
+  "stdout": "Validating zCFD configuration: testcases/testcases/naca0012/n0012_449_a0p0_imp.py\nLoading and validating configuration...\nConfiguration validation passed!\nValidated configuration type: ZCFDInputModelBase\nSolver type: compressible\nEquation type: rans\n"
+ },
+ "warning_only:json": {
+  "rc": 0,
+  "stderr": "",
+  "stdout": "{\"valid\": true, \"errors\": [], \"warnings\": [{\"nodes\": [\"reference conditions\"], \"field_name\": \"\", \"field_path\": \"solver.reference_conditions\", \"path\": [\"solver\", \"reference_conditions\"], \"title\": \"Reference Conditions\", \"display_message\": \"Reference condition 'IC_2' is not used anywhere in the deck.\", \"message\": \"solver.reference_conditions: Reference condition 'IC_2' is not used anywhere in the deck.\", \"anchor\": \"reference/solver/reference-conditions\", \"severity\": \"warning\"}]}\n"
+ },
+ "warning_only:text": {
+  "rc": 0,
+  "stderr": "[WARNING] solver.reference_conditions: Reference condition 'IC_2' is not used anywhere in the deck.\n",
+  "stdout": "Validating zCFD configuration: testcases/testcases/plate/plate_coarse.py\nConfiguration validation passed!\n"
+ }
+}
