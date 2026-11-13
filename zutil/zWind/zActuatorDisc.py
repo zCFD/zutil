@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -70,6 +70,10 @@ class zActuatorDiscSegment:
 
         self.segment_centre = self.disc_centre + self.local_vector
 
+        # The first controller pass reads v_n/v_r/omega_air/u_ref_local before
+        # any annulus velocity has been sampled.
+        self.calculate_velocity_vector(np.zeros(3))
+
     def _rotation_matrix(self) -> np.ndarray:
         """Constructs the rotation matrix from the disc normal."""
         return R_2vect(np.array([0, 0, 1]), self.disc_normal)
@@ -95,7 +99,7 @@ class zActuactorDisc:
     def __init__(self, control_dict: dict, verbose: bool = False) -> None:
         # create turbine model
 
-        self.n_segments = control_dict["discretisation"]["number of elements"]
+        self.n_segments = control_dict["discretisation"]["number_of_elements"]
         self.verbose = verbose
 
         self.turbine = zTurbine(control_dict)

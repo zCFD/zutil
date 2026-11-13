@@ -1,0 +1,52 @@
+[
+  {
+    "case": "a key the mesh leaves out comes from the solver",
+    "block": "numerical_scheme",
+    "solver": {"order": "second", "limiter": "van leer"},
+    "mesh": {"order": "first"},
+    "resolved": {"order": "first", "limiter": "van leer"}
+  },
+  {
+    "case": "dicts merge at every depth",
+    "block": "output_settings",
+    "solver": {"report": {"frequency": 10, "forces": {"fr_1": {"zones": [1]}}}},
+    "mesh": {"report": {"forces": {"fr_2": {"zones": [2]}}}},
+    "resolved": {"report": {"frequency": 10, "forces": {"fr_1": {"zones": [1]}, "fr_2": {"zones": [2]}}}}
+  },
+  {
+    "case": "a list replaces the solver list whole",
+    "block": "output_settings",
+    "solver": {"solution": {"volume_variables": ["p", "V"], "format": "vtk"}},
+    "mesh": {"solution": {"volume_variables": ["p"]}},
+    "resolved": {"solution": {"volume_variables": ["p"], "format": "vtk"}}
+  },
+  {
+    "case": "a sub-block naming a different variant replaces the solver's",
+    "block": "convergence_control",
+    "solver": {"cycles": 10, "scheme": {"name": "lu-sgs", "sub_iterations": 4}},
+    "mesh": {"scheme": {"name": "runge kutta", "stage": 5}},
+    "resolved": {"cycles": 10, "scheme": {"name": "runge kutta", "stage": 5}}
+  },
+  {
+    "case": "the same variant in another case merges",
+    "block": "convergence_control",
+    "solver": {"cycles": 10, "scheme": {"name": "lu-sgs", "sub_iterations": 4}},
+    "mesh": {"scheme": {"name": "LU-SGS", "over_relaxation": 1.2}},
+    "resolved": {"cycles": 10, "scheme": {"name": "LU-SGS", "sub_iterations": 4, "over_relaxation": 1.2}}
+  },
+  {
+    "case": "a different type replaces the block whole",
+    "block": "initialisation",
+    "solver": {"type": "a", "x": 1},
+    "mesh": {"type": "b"},
+    "resolved": {"type": "b"}
+  },
+  {
+    "case": "an incompressible mesh never takes the run-wide coupling scheme",
+    "block": "convergence_control",
+    "solver_type": "incompressible",
+    "solver": {"cycles": 200, "scheme": {"name": "simple"}},
+    "mesh": {"inner_convergence": {"tolerance": 0.01}},
+    "resolved": {"cycles": 200, "inner_convergence": {"tolerance": 0.01}}
+  }
+]

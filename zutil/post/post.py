@@ -1,5 +1,5 @@
 """
-Copyright (c) 2012-2024, Zenotech Ltd
+Copyright (c) 2012-2026, Zenotech Ltd
 All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -30,7 +30,6 @@ Helper functions for accessing zCFD Paraview functionality
 
 from tqdm import tqdm
 from zutil import analysis
-import json
 
 import paraview.simple as pvs
 from builtins import object
@@ -167,30 +166,38 @@ class GeomFilterGT(object):
 
 
 def clean_vtk(
-    vtk_object: object, cellDataToPointData: bool = True, mergeBlocks: bool = True
+    vtk_object: object,
+    cellDataToPointData: bool = True,
+    mergeBlocks: bool = True,
+    cleanToGrid: bool = False,
 ):
     """Takes a VTK object, and performs basic cleanup operations:
-    cleanToGrid
     mergeBlocks [optional]
     cellDataToPointData [optional]
+    cleanToGrid [optional]
 
     Args:
         vtk_object: A loaded vtk object
     Optional:
         mergeBlocks: default=True-Whether to perform a mergeBlocks operation on the data
         cellDataToPointData: defult=True- Whether to perform a cellDataToPointData mapping on the object
+        cleanToGrid: default=False- zCFD vtkhdf output carries ghost info
+            (#5591) so CleantoGrid (~100s/call on large grids) is redundant;
+            pass True only for data from other sources that needs stitching.
     """
     if mergeBlocks:
         data = pvs.MergeBlocks(Input=vtk_object)
-        data = pvs.CleantoGrid(Input=data)
     else:
-        data = pvs.CleantoGrid(Input=vtk_object)
+        data = vtk_object
+    if cleanToGrid:
+        data = pvs.CleantoGrid(Input=data)
 
     if cellDataToPointData:
         data = pvs.CellDatatoPointData(Input=data)
         data.ProcessAllArrays = 1
         data.PassCellData = 1
-        pvs.UpdatePipeline()
+        # Update this filter, not whatever source happens to be active.
+        data.UpdatePipeline()
 
     return data
 
@@ -639,22 +646,24 @@ def cf_profile_wall_from_file(
     wall.UpdatePipeline()
     inp_wall = pvs.servermanager.Fetch(wall)
 
+    # No CleantoGrid: zCFD vtkhdf output carries ghost info (#5591), and the
+    # filter costs ~100s per call on large surfaces.
     if inp_wall.IsA("vtkMultiBlockDataSet") or inp_wall.IsA(
         "vtkPartitionedDataSetCollection"
     ):
-        merged = pvs.MergeBlocks(Input=wall)
-        clean = pvs.CleantoGrid(Input=merged)
+        clean = pvs.MergeBlocks(Input=wall)
     else:
-        clean = pvs.CleantoGrid(Input=wall)
+        clean = wall
 
     clean.UpdatePipeline()
     inp = pvs.servermanager.Fetch(clean)
 
+    out = cf_profile(inp, slice_normal, slice_origin, **kwargs)
+    if clean is not wall:
+        pvs.Delete(clean)
+    del clean
     pvs.Delete(wall)
     del wall
-    out = cf_profile(inp, slice_normal, slice_origin, **kwargs)
-    pvs.Delete(clean)
-    del clean
     pvs.Delete(inp)
     del inp
 
@@ -762,19 +771,16 @@ def get_status_dict(case_name: str, **kwargs) -> Optional[str]:
     if "data_dir" in kwargs:
         _data_dir = kwargs["data_dir"]
 
-    try:
-        # Get contents of local file
-        with open(_data_dir + "/" + case_name + "_status.txt") as f:
-            status_file_str = f.read()
+    # Read YAML status file
+    yaml_path = _data_dir + "/" + case_name + "_status.yaml"
 
-            if status_file_str is not None:
-                # print status_file_str
-                return json.loads(status_file_str)
-            else:
-                print("WARNING: " + case_name + "_status.txt file not found")
-                return None
+    try:
+        import yaml
+
+        with open(yaml_path) as f:
+            return yaml.safe_load(f)
     except Exception as e:
-        print("WARNING: " + case_name + "_status.txt file not found")
+        print("WARNING: " + case_name + "_status.yaml file not found")
         print("Caught exception " + str(e))
         return None
 
@@ -792,11 +798,9 @@ def get_num_procs(case_name: str, **kwargs) -> Optional[int]:
         print("status file not found")
 
 
-def get_case_root(case_name: str, num_procs: Optional[str]) -> str:
+def get_case_root(case_name: str, num_procs: Optional[str] = None) -> str:
     """Returns the output folder path for a specified zCFD run"""
-    if num_procs is None:
-        num_procs = get_num_procs(case_name)
-    return case_name + "_P" + str(num_procs) + "_OUTPUT/" + case_name
+    return case_name + "_OUTPUT/" + case_name
 
 
 def get_case_report(case: str) -> str:
@@ -813,7 +817,7 @@ def get_case_success(case: str) -> bool:
             for line in f.readlines():
                 if "Solver loop finished" in line:
                     return True
-    except FileExistsError as e:
+    except FileNotFoundError as e:
         print(e)
         return False
     return False
